@@ -98,28 +98,27 @@ export function EarCaptureApp() {
   const offset = offsets[side];
   const promptText = poseConfig.copy[live.prompt];
 
+  const liveRef = useRef(live);
+  liveRef.current = live;
+
   const captureStill = useCallback(() => {
     const video = videoRef.current;
     const canvas = document.createElement("canvas");
+    const snap = liveRef.current;
     if (simRef.current.enabled || !video || video.readyState < 2) {
       canvas.width = 960;
       canvas.height = 540;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      ctx.fillStyle = "#101816";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#d8f6ea";
-      ctx.font = "28px ui-sans-serif, sans-serif";
-      ctx.fillText(
-        sideRef.current === "rightEar" ? "右耳 · 模拟/无画面拍摄" : "左耳 · 模拟/无画面拍摄",
-        40,
-        80,
-      );
-      ctx.font = "20px ui-sans-serif, sans-serif";
-      ctx.fillText(
-        `yaw ${live.yaw?.toFixed(1) ?? "—"}  pitch ${live.pitch?.toFixed(1) ?? "—"}  roll ${live.roll?.toFixed(1) ?? "—"}`,
-        40,
-        130,
+      drawSimStill(
+        ctx,
+        canvas.width,
+        canvas.height,
+        sideRef.current,
+        simRef.current,
+        snap.yaw,
+        snap.pitch,
+        snap.roll,
       );
     } else {
       canvas.width = video.videoWidth;
@@ -130,7 +129,7 @@ export function EarCaptureApp() {
     }
     const url = canvas.toDataURL("image/png");
     setLastCapture(url);
-  }, [live.pitch, live.roll, live.yaw, videoRef]);
+  }, [videoRef]);
 
   const captureStillRef = useRef(captureStill);
   captureStillRef.current = captureStill;
@@ -533,7 +532,12 @@ function drawCameraOverlay(
   ctx.strokeRect(roi.x, roi.y, roi.w, roi.h);
   ctx.font = `${Math.max(18, width / 45)}px ui-sans-serif, sans-serif`;
   ctx.fillStyle = ctx.strokeStyle;
-  ctx.fillText(side === "rightEar" ? "右耳 ROI" : "左耳 ROI", roi.x + 8, roi.y + 28);
+  fillUnmirroredText(
+    ctx,
+    side === "rightEar" ? "右耳 ROI" : "左耳 ROI",
+    roi.x + 8,
+    roi.y + 28,
+  );
 }
 
 function drawSimOverlay(
@@ -568,6 +572,75 @@ function drawSimOverlay(
   ctx.lineWidth = 3;
   ctx.strokeRect(roiX, 180, 140, 180);
   ctx.fillStyle = "#5ee0b5";
+  ctx.font = "20px ui-sans-serif, sans-serif";
+  fillUnmirroredText(
+    ctx,
+    side === "rightEar" ? "右耳 ROI" : "左耳 ROI",
+    roiX + 8,
+    170,
+  );
+}
+
+/** Canvas is CSS-mirrored with the selfie preview; pre-flip glyphs so they read LTR. */
+function fillUnmirroredText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+) {
+  const w = ctx.measureText(text).width;
+  ctx.save();
+  ctx.translate(x + w, y);
+  ctx.scale(-1, 1);
+  ctx.fillText(text, 0, 0);
+  ctx.restore();
+}
+
+function drawSimStill(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  side: EarSide,
+  sim: SimState,
+  yaw: number | null,
+  pitch: number | null,
+  roll: number | null,
+) {
+  ctx.fillStyle = "#e7f4ee";
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = "#0b1210";
+  ctx.font = "32px ui-sans-serif, sans-serif";
+  ctx.fillText(
+    side === "rightEar" ? "右耳 · 模拟拍摄" : "左耳 · 模拟拍摄",
+    40,
+    56,
+  );
+  ctx.font = "22px ui-sans-serif, sans-serif";
+  ctx.fillText(
+    `yaw ${yaw?.toFixed(1) ?? "—"}°   pitch ${pitch?.toFixed(1) ?? "—"}°   roll ${roll?.toFixed(1) ?? "—"}°`,
+    40,
+    96,
+  );
+
+  ctx.save();
+  ctx.translate(width / 2, height / 2 + 20);
+  ctx.rotate(((-(roll ?? 0)) * Math.PI) / 180);
+  ctx.fillStyle = sim.hasFace ? "#c9a07a" : "#7a8a84";
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 90, 120, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#1b1612";
+  ctx.beginPath();
+  ctx.ellipse(-28, -20, 8, 6, 0, 0, Math.PI * 2);
+  ctx.ellipse(28, -20, 8, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  const roiX = side === "rightEar" ? 160 : 680;
+  ctx.strokeStyle = "#1a4f43";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(roiX, 180, 140, 180);
+  ctx.fillStyle = "#1a4f43";
   ctx.font = "20px ui-sans-serif, sans-serif";
   ctx.fillText(side === "rightEar" ? "右耳 ROI" : "左耳 ROI", roiX + 8, 170);
 }
