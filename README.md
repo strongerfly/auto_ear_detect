@@ -1,5 +1,7 @@
 # auto_ear_detect
 
+[![CI](https://github.com/strongerfly/auto_ear_detect/actions/workflows/ci.yml/badge.svg)](https://github.com/strongerfly/auto_ear_detect/actions/workflows/ci.yml)
+
 Real-time **head-pose guided ear capture**. The webcam + MediaPipe Face Landmarker estimate yaw / pitch / roll, Chinese on-screen copy tells the user how to turn, and capture is gated until a frontal view of the chosen ear is stable and sharp.
 
 Stack: **Vite + React + TypeScript** + `@mediapipe/tasks-vision` Face Landmarker (`VIDEO` mode, `outputFacialTransformationMatrixes: true`).
@@ -18,6 +20,8 @@ Open the printed local URL (default http://localhost:5173). Allow the camera. Us
 npm run build
 npm run preview
 ```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs `npm ci`, `npm test`, and `npm run build` on push and pull requests to `main`.
 
 No API keys. The Face Landmarker WASM loads from jsDelivr; the `.task` model is served from `public/models/` when present, otherwise Google’s MediaPipe model host.
 
