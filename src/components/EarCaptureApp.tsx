@@ -85,6 +85,8 @@ export function EarCaptureApp() {
   const lastVideoTime = useRef(-1);
   const smootherRef = useRef<EulerSmoother | null>(null);
   const readyBurst = useRef(0);
+  const hadTrackedFace = useRef(false);
+  const searchStartedAt = useRef<number | null>(null);
 
   sideRef.current = side;
   bestsRef.current = bests;
@@ -95,6 +97,11 @@ export function EarCaptureApp() {
     const o = poseConfig.smoothing.oneEuro;
     smootherRef.current = new EulerSmoother(o.minCutoff, o.beta, o.dCutoff);
   }, []);
+
+  useEffect(() => {
+    hadTrackedFace.current = false;
+    searchStartedAt.current = null;
+  }, [side]);
 
   const personalBest = bests[side];
   const promptText = t(live.prompt);
@@ -297,6 +304,11 @@ export function EarCaptureApp() {
           : 0;
       lastAngles.current = angles;
 
+      if (hasFace) {
+        hadTrackedFace.current = true;
+        if (searchStartedAt.current === null) searchStartedAt.current = now;
+      }
+
       if (hasFace && angles && quality) {
         const prevPeak = bestsRef.current[currentSide];
         const nextPeak = updatePersonalBest(prevPeak, {
@@ -330,7 +342,14 @@ export function EarCaptureApp() {
         currentSide,
         bestsRef.current[currentSide],
         stableFrames.current,
-        { yawDelta },
+        {
+          yawDelta,
+          hadTrackedFace: hadTrackedFace.current,
+          searchElapsedMs:
+            searchStartedAt.current === null
+              ? 0
+              : now - searchStartedAt.current,
+        },
       );
 
       dwellRef.current = dwellPrompt(
@@ -381,6 +400,7 @@ export function EarCaptureApp() {
     bestsRef.current = next;
     setBests(next);
     savePersonalBests(next);
+    searchStartedAt.current = null;
   };
 
   const downloadCapture = () => {
@@ -494,9 +514,7 @@ export function EarCaptureApp() {
 
       <div className="dock">
         <span className="calib-note">
-          {personalBest
-            ? t("learnedNote")
-            : t("learningNote")}
+          {personalBest ? t("learnedNote") : t("learningNote")}
         </span>
         <button type="button" className="ghost" onClick={recalibrateSide}>
           {t("relearn")}

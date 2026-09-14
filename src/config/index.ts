@@ -17,12 +17,15 @@ export type PromptKey =
   | "SLOW_DOWN"
   | "WRONG_SIDE"
   | "CLEAR_HAIR"
+  | "HOLD_NEAR_PEAK"
   | "HOLD_STILL"
   | "BAD_LIGHT"
   | "TOO_DARK"
   | "TOO_BRIGHT"
   | "MULTI_FACE"
-  | "READY";
+  | "READY"
+  | "FAIL_TIMEOUT"
+  | "FAIL_TRACKING";
 
 export type PoseConfig = typeof poseConfigJson;
 
@@ -43,10 +46,13 @@ export const PROMPT_KEYS: PromptKey[] = [
   "SLOW_DOWN",
   "WRONG_SIDE",
   "CLEAR_HAIR",
+  "HOLD_NEAR_PEAK",
   "HOLD_STILL",
   "BAD_LIGHT",
   "TOO_DARK",
   "TOO_BRIGHT",
   "MULTI_FACE",
   "READY",
+  "FAIL_TIMEOUT",
+  "FAIL_TRACKING",
 ];

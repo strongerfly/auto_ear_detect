@@ -18,18 +18,19 @@
     "maxFaceHeightRatio": 0.70
   },
   "search": {
-    "yawAbsMin": 35,
-    "yawAbsMax": 90,
-    "preferredAbsMin": 40,
-    "preferredAbsMax": 80,
-    "priorYawAbs": 60,
-    "pitchMin": -10,
-    "pitchMax": 10,
-    "rollMin": -8,
-    "rollMax": 8,
+    "rightEar": {
+      "yawAbsMin": 35, "yawAbsMax": 90,
+      "preferredAbsMin": 40, "preferredAbsMax": 80
+    },
+    "leftEar": {
+      "yawAbsMin": 35, "yawAbsMax": 90,
+      "preferredAbsMin": 40, "preferredAbsMax": 80
+    },
+    "pitchMin": -10, "pitchMax": 10, "rollMin": -8, "rollMax": 8,
     "minSweepCoverageRatio": 0.6,
     "allowResweepOnce": true,
     "tieBreak": "smallerAbsYaw",
+    "priorYawAbs": 60,
     "guidanceCoarseAbsError": 22,
     "slowYawDeltaDeg": 18
   },
@@ -64,9 +65,10 @@
     "rollMaxAbs": 8
   },
   "personalBest": {
-    "persist": true,
-    "alwaysRescore": true,
+    "persistSessionOffset": true,
+    "clampOffsetDeg": 20,
     "nextTimeNarrowSearchByDeg": 10,
+    "alwaysRescore": true,
     "minScoreImprove": 0.02
   },
   "poseGuidance": {

@@ -45,10 +45,14 @@ function familyOf(prompt: PromptKey): Family {
     case "TOO_DARK":
     case "TOO_BRIGHT":
       return "quality";
+    case "HOLD_NEAR_PEAK":
     case "HOLD_STILL":
       return "hold";
     case "READY":
       return "ready";
+    case "FAIL_TIMEOUT":
+    case "FAIL_TRACKING":
+      return "face";
   }
 }
 

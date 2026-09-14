@@ -29,6 +29,8 @@ export type GuidanceInput = {
 
 export type GuidanceExtras = {
   yawDelta?: number;
+  hadTrackedFace?: boolean;
+  searchElapsedMs?: number;
 };
 
 export type GuidanceResult = {
@@ -105,6 +107,7 @@ export function pickPrompt(
     peak,
     input.yaw,
     config,
+    targets.side,
   );
 
   const fail: Omit<GuidanceResult, "prompt"> = {
@@ -120,7 +123,8 @@ export function pickPrompt(
     input.facePresence < config.faceGates.minFacePresence ||
     input.trackingConfidence < config.faceGates.minTrackingConfidence
   ) {
-    return { ...fail, prompt: "NO_FACE", poseNear: false, poseReady: false };
+    const lost = extras.hadTrackedFace ? "FAIL_TRACKING" : "NO_FACE";
+    return { ...fail, prompt: lost, poseNear: false, poseReady: false };
   }
   if ((input.faceCount ?? 1) > 1) {
     return { ...fail, prompt: "MULTI_FACE", poseNear: false, poseReady: false };
@@ -130,6 +134,14 @@ export function pickPrompt(
   }
   if (input.faceHeightRatio > config.faceGates.maxFaceHeightRatio) {
     return { ...fail, prompt: "TOO_CLOSE", poseNear: false, poseReady: false };
+  }
+
+  const stuckNoPeak =
+    !targets.locked &&
+    (extras.searchElapsedMs ?? 0) >= config.failure.timeoutMs &&
+    (extras.yawDelta ?? 0) < 2;
+  if (stuckNoPeak) {
+    return { ...fail, prompt: "FAIL_TIMEOUT" };
   }
 
   const absYawErr = Math.abs(input.yaw - targets.yawCenter);
@@ -184,7 +196,7 @@ export function pickPrompt(
   if (allowCapture) {
     return { ...fail, prompt: "READY", allowCapture: true };
   }
-  return { ...fail, prompt: "HOLD_STILL" };
+  return { ...fail, prompt: "HOLD_NEAR_PEAK" };
 }
 
 export function evaluateGuidance(
