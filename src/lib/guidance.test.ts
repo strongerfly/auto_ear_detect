@@ -549,6 +549,9 @@ describe("prompt dwell", () => {
   it("promotes READY faster than cross-family switches", () => {
     const ux = poseConfig.promptUx;
     expect(dwellMsFor("TURN_MORE", "READY", ux)).toBe(ux.readyPromoteMs);
+    expect(dwellMsFor("TURN_BACK_OVERSHOOT", "HOLD_STILL", ux)).toBe(
+      ux.readyPromoteMs,
+    );
     expect(dwellMsFor("TURN_MORE", "TURN_BACK", ux)).toBe(ux.minDwellMs);
     expect(dwellMsFor("NO_FACE", "TURN_MORE", ux)).toBe(ux.crossFamilyDwellMs);
   });

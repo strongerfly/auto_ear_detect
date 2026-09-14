@@ -58,7 +58,7 @@ export function dwellMsFor(
   ux: DwellUx,
 ): number {
   if (from === null) return 0;
-  if (to === "READY") return ux.readyPromoteMs ?? 200;
+  if (to === "READY" || to === "HOLD_STILL") return ux.readyPromoteMs ?? 200;
   if (familyOf(from) === familyOf(to)) return ux.minDwellMs;
   return ux.crossFamilyDwellMs ?? ux.minDwellMs;
 }

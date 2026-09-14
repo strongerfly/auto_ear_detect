@@ -34,8 +34,13 @@ export function SimulatorPanel({
 }) {
   const { t } = useLocale();
   const set = (patch: Partial<SimState>) => onChange({ ...sim, ...patch });
-  const setQ = (patch: Partial<EarQuality>) =>
-    onChange({ ...sim, quality: { ...sim.quality, ...patch } });
+  const setQ = (patch: Partial<EarQuality>) => {
+    const quality = { ...sim.quality, ...patch };
+    if (patch.laplacian !== undefined && patch.edgeEnergy === undefined) {
+      quality.edgeEnergy = Math.round((patch.laplacian / 180) * 40);
+    }
+    onChange({ ...sim, quality });
+  };
 
   return (
     <details className="sim" open={sim.enabled}>

@@ -44,6 +44,11 @@ import {
   type PersonalBestMap,
 } from "../lib/personal-best";
 import { measureEarQuality, qualityAlongYawCurve } from "../lib/quality";
+import {
+  startRelearnHoldoff,
+  stepRelearnHoldoff,
+  type RelearnHoldoff,
+} from "../lib/relearn";
 import type { EarQuality, EulerDeg, RoiBox } from "../lib/types";
 
 type LiveState = {
@@ -102,6 +107,7 @@ export function EarCaptureApp() {
   const shutterRef = useRef<AutoshutterState>(INITIAL_AUTOSHUTTER);
   const cancelShutterRef = useRef(false);
   const wasInReadyBand = useRef(false);
+  const relearnHoldoffRef = useRef<RelearnHoldoff | null>(null);
   const dwellRef = useRef<DwellState>(INITIAL_DWELL);
   const lastAngles = useRef<EulerDeg | null>(null);
   const stableFrames = useRef(0);
@@ -310,7 +316,16 @@ export function EarCaptureApp() {
       const yawDelta = Math.abs(yawDeltaSigned);
       lastAngles.current = angles;
 
-      if (hasFace && angles && quality) {
+      relearnHoldoffRef.current = stepRelearnHoldoff(
+        relearnHoldoffRef.current,
+        currentSide,
+        yaw,
+        poseConfig.search.relearnSweepMinDeg,
+      );
+      const holdoff = relearnHoldoffRef.current;
+      const deferBest = holdoff !== null && holdoff.side === currentSide;
+
+      if (hasFace && angles && quality && !deferBest) {
         const prevPeak = bestsRef.current[currentSide];
         const nextPeak = updatePersonalBest(prevPeak, {
           yaw: angles.yaw,
@@ -435,6 +450,9 @@ export function EarCaptureApp() {
     dwellRef.current = INITIAL_DWELL;
     wasInReadyBand.current = false;
     shutterRef.current = INITIAL_AUTOSHUTTER;
+    relearnHoldoffRef.current = startRelearnHoldoff(side, liveRef.current.yaw);
+    stableFrames.current = 0;
+    lastAngles.current = null;
     setRelearnOpen(false);
   };
 

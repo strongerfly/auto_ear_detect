@@ -31,7 +31,8 @@
     "allowResweepOnce": true,
     "tieBreak": "smallerAbsYaw",
     "guidanceCoarseAbsError": 22,
-    "slowYawDeltaDeg": 18
+    "slowYawDeltaDeg": 18,
+    "relearnSweepMinDeg": 15
   },
   "score": {
     "weights": { "sharp": 0.45, "struct": 0.35, "content": 0.20 },
