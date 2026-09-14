@@ -18,33 +18,31 @@
   },
   "poseTargets": {
     "rightEar": {
-      "yawCenter": 80, "yawMin": 70, "yawMax": 90,
+      "yawCenter": 80,
       "pitchMin": -8, "pitchMax": 8, "rollMin": -8, "rollMax": 8
     },
     "leftEar": {
-      "yawCenter": -80, "yawMin": -90, "yawMax": -70,
+      "yawCenter": -80,
       "pitchMin": -8, "pitchMax": 8, "rollMin": -8, "rollMax": 8
     }
   },
   "poseGuidance": {
     "rollCorrectAbove": 12,
     "pitchTooHighAbove": 12,
-    "pitchTooLowBelow": -12,
-    "rightEar": { "turnMoreBelow": 55, "almostBelow": 70, "tooFarAbove": 95 },
-    "leftEar": { "turnMoreAbove": -55, "almostAbove": -70, "tooFarBelow": -95 }
+    "pitchTooLowBelow": -12
   },
   "captureBands": {
     "nearMaxAbsYawError": 10,
-    "readyMaxAbsYawError": 5,
+    "readyMaxAbsYawError": 8,
     "readyMaxAbsPitchError": 8,
     "readyMaxAbsRollError": 8
   },
-  "personalOffset": {
-    "enabled": true,
-    "clampDeg": 15,
-    "calibrationYawMinAbs": 60,
-    "calibrationYawMaxAbs": 95,
-    "defaultOffset": { "leftEar": 0, "rightEar": 0 }
+  "personalBest": {
+    "searchYawMinAbs": 35,
+    "searchYawMaxAbs": 100,
+    "guidanceCoarseAbsError": 25,
+    "qualityCollapseRatio": 0.65,
+    "minScoreImprove": 2
   },
   "stability": {
     "requiredStableFrames": 12,

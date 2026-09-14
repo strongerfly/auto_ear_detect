@@ -22,13 +22,12 @@ import {
 } from "../lib/landmarks";
 import { EulerSmoother } from "../lib/one-euro";
 import {
-  loadOffsets,
-  offsetFromPeakYaw,
-  saveOffsets,
-  yawInCalibrationBand,
-  type OffsetMap,
-} from "../lib/offsets";
-import { measureEarQuality } from "../lib/quality";
+  loadPersonalBests,
+  savePersonalBests,
+  updatePersonalBest,
+  type PersonalBestMap,
+} from "../lib/personal-best";
+import { measureEarQuality, qualityAlongYawCurve } from "../lib/quality";
 import type { EarQuality, EulerDeg, RoiBox } from "../lib/types";
 
 type LiveState = {
@@ -62,19 +61,16 @@ export function EarCaptureApp() {
   const sampleRef = useRef<HTMLCanvasElement | null>(null);
 
   const [side, setSide] = useState<EarSide>("rightEar");
-  const [offsets, setOffsets] = useState<OffsetMap>(() => loadOffsets());
+  const [bests, setBests] = useState<PersonalBestMap>(() => loadPersonalBests());
   const [autoShutter, setAutoShutter] = useState(true);
-  const [calibrating, setCalibrating] = useState(false);
-  const [calibBest, setCalibBest] = useState({ laplacian: -1, yaw: 0 });
   const [lastCapture, setLastCapture] = useState<string | null>(null);
   const [sim, setSim] = useState<SimState>(DEFAULT_SIM);
   const [live, setLive] = useState<LiveState>(INITIAL_LIVE);
   const [status, setStatus] = useState("正在加载 Face Landmarker…");
 
   const sideRef = useRef(side);
-  const offsetsRef = useRef(offsets);
+  const bestsRef = useRef(bests);
   const simRef = useRef(sim);
-  const calibratingRef = useRef(calibrating);
   const autoShutterRef = useRef(autoShutter);
   const shutterLatch = useRef(false);
   const dwellRef = useRef<DwellState>(INITIAL_DWELL);
@@ -82,12 +78,10 @@ export function EarCaptureApp() {
   const stableFrames = useRef(0);
   const lastVideoTime = useRef(-1);
   const smootherRef = useRef<EulerSmoother | null>(null);
-  const calibBestRef = useRef({ laplacian: -1, yaw: 0 });
 
   sideRef.current = side;
-  offsetsRef.current = offsets;
+  bestsRef.current = bests;
   simRef.current = sim;
-  calibratingRef.current = calibrating;
   autoShutterRef.current = autoShutter;
 
   useEffect(() => {
@@ -95,7 +89,7 @@ export function EarCaptureApp() {
     smootherRef.current = new EulerSmoother(o.minCutoff, o.beta, o.dCutoff);
   }, []);
 
-  const offset = offsets[side];
+  const personalBest = bests[side];
   const promptText = poseConfig.copy[live.prompt];
 
   const liveRef = useRef(live);
@@ -171,7 +165,13 @@ export function EarCaptureApp() {
         yaw = simState.yaw;
         pitch = simState.pitch;
         roll = simState.roll;
-        quality = simState.quality;
+        quality = simState.qualityFollowsYaw
+          ? qualityAlongYawCurve(
+              simState.yaw,
+              simState.qualityPeakYaw,
+              simState.quality,
+            )
+          : simState.quality;
         if (overlay) {
           drawSimOverlay(overlay, currentSide, simState);
         }
@@ -273,6 +273,23 @@ export function EarCaptureApp() {
       }
       lastAngles.current = angles;
 
+      if (hasFace && angles && quality) {
+        const prevPeak = bestsRef.current[currentSide];
+        const nextPeak = updatePersonalBest(prevPeak, {
+          yaw: angles.yaw,
+          pitch: angles.pitch,
+          roll: angles.roll,
+          quality,
+          side: currentSide,
+        });
+        if (nextPeak !== prevPeak) {
+          const nextMap = { ...bestsRef.current, [currentSide]: nextPeak };
+          bestsRef.current = nextMap;
+          setBests(nextMap);
+          savePersonalBests(nextMap);
+        }
+      }
+
       const guidance = evaluateGuidance(
         {
           hasFace,
@@ -286,7 +303,7 @@ export function EarCaptureApp() {
         },
         poseConfig,
         currentSide,
-        offsetsRef.current[currentSide],
+        bestsRef.current[currentSide],
         stableFrames.current,
       );
 
@@ -297,21 +314,6 @@ export function EarCaptureApp() {
         poseConfig.promptUx.minDwellMs,
       );
       const shown = dwellRef.current.displayed ?? guidance.prompt;
-
-      if (
-        calibratingRef.current &&
-        angles &&
-        quality &&
-        yawInCalibrationBand(angles.yaw)
-      ) {
-        if (quality.laplacian > calibBestRef.current.laplacian) {
-          calibBestRef.current = {
-            laplacian: quality.laplacian,
-            yaw: angles.yaw,
-          };
-          setCalibBest(calibBestRef.current);
-        }
-      }
 
       if (guidance.allowCapture && autoShutterRef.current && !shutterLatch.current) {
         shutterLatch.current = true;
@@ -337,27 +339,11 @@ export function EarCaptureApp() {
     return () => cancelAnimationFrame(raf);
   }, [landmarker, videoRef]);
 
-  const startCalibration = () => {
-    calibBestRef.current = { laplacian: -1, yaw: 0 };
-    setCalibBest(calibBestRef.current);
-    setCalibrating(true);
-  };
-
-  const finishCalibration = () => {
-    setCalibrating(false);
-    if (calibBestRef.current.laplacian < 0) return;
-    const next = {
-      ...offsets,
-      [side]: offsetFromPeakYaw(side, calibBestRef.current.yaw),
-    };
-    setOffsets(next);
-    saveOffsets(next);
-  };
-
-  const clearOffset = () => {
-    const next = { ...offsets, [side]: 0 };
-    setOffsets(next);
-    saveOffsets(next);
+  const recalibrateSide = () => {
+    const next = { ...bests, [side]: null };
+    bestsRef.current = next;
+    setBests(next);
+    savePersonalBests(next);
   };
 
   const downloadCapture = () => {
@@ -427,7 +413,7 @@ export function EarCaptureApp() {
         yaw={live.yaw}
         pitch={live.pitch}
         roll={live.roll}
-        offset={offset}
+        bestYaw={personalBest}
         prompt={live.prompt}
       />
 
@@ -465,26 +451,13 @@ export function EarCaptureApp() {
       </div>
 
       <div className="dock">
-        {calibrating ? (
-          <>
-            <span className="calib-note">
-              请慢慢转头（|yaw| 60–95°），峰值清晰度{" "}
-              {calibBest.laplacian < 0 ? "—" : calibBest.laplacian.toFixed(0)}
-              {calibBest.laplacian >= 0
-                ? ` @ ${calibBest.yaw.toFixed(1)}°`
-                : ""}
-            </span>
-            <button type="button" className="ghost" onClick={finishCalibration}>
-              完成校准
-            </button>
-          </>
-        ) : (
-          <button type="button" className="ghost" onClick={startCalibration}>
-            校准此侧偏移
-          </button>
-        )}
-        <button type="button" className="ghost" onClick={clearOffset}>
-          清除此侧偏移
+        <span className="calib-note">
+          {personalBest
+            ? `此侧最佳角度 ${personalBest.yaw.toFixed(1)}°（转头时自动学习）`
+            : "请慢慢转头，系统会记住此侧耳区最清晰的角度"}
+        </span>
+        <button type="button" className="ghost" onClick={recalibrateSide}>
+          重新学习此侧
         </button>
         {live.quality ? (
           <span className="calib-note">
@@ -506,7 +479,8 @@ export function EarCaptureApp() {
 
       <footer className="foot">
         <p>
-          FISWG：+yaw 露右耳，−yaw 露左耳。Euler 顺序 YXZ。阈值见{" "}
+          FISWG：+yaw 露右耳，−yaw 露左耳。Euler 顺序 YXZ。拍摄目标按耳区清晰度自动学习（约
+          35°–100°），不固定 70–90。阈值见{" "}
           <code>src/config/pose-config.json</code>。
         </p>
       </footer>

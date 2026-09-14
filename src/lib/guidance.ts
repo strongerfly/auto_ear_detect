@@ -11,6 +11,10 @@ import {
   inReadyBand,
   type EffectiveTargets,
 } from "./effective-targets";
+import {
+  qualityCollapsing,
+  type PeakSample,
+} from "./personal-best";
 
 export type GuidanceInput = {
   hasFace: boolean;
@@ -32,22 +36,27 @@ export type GuidanceResult = {
   allowCapture: boolean;
 };
 
+/** Turn hints relative to the current personal best (or the ±80° prior). */
 function pickYawPrompt(yaw: number, t: EffectiveTargets): PromptKey | null {
+  const err = yaw - t.yawCenter;
+  const { coarseAbsError: coarse, fineAbsError: fine } = t;
   if (t.side === "rightEar") {
-    if (yaw < (t.turnMoreBelow ?? 55)) return "TURN_LEFT";
-    if (yaw < (t.almostBelow ?? 70)) return "TURN_LEFT_MORE";
-    if (yaw > (t.tooFarAbove ?? 95)) return "TURN_LEFT_BACK";
+    if (err < -coarse) return "TURN_LEFT";
+    if (err < -fine) return "TURN_LEFT_MORE";
+    if (err > fine) return "TURN_LEFT_BACK";
     return null;
   }
-  if (yaw > (t.turnMoreAbove ?? -55)) return "TURN_RIGHT";
-  if (yaw > (t.almostAbove ?? -70)) return "TURN_RIGHT_MORE";
-  if (yaw < (t.tooFarBelow ?? -95)) return "TURN_RIGHT_BACK";
+  if (err > coarse) return "TURN_RIGHT";
+  if (err > fine) return "TURN_RIGHT_MORE";
+  if (err < -fine) return "TURN_RIGHT_BACK";
   return null;
 }
 
 /**
  * Priority: NO_FACE → distance → roll → pitch → yaw turn hints →
  * hair/light/blur → HOLD_STILL → READY.
+ *
+ * READY requires a locked personal bestYaw, not the old 70–90 band.
  */
 export function pickPrompt(
   input: GuidanceInput,
@@ -65,6 +74,11 @@ export function pickPrompt(
     config.captureBands,
   );
   const stable = stableFrames >= config.stability.requiredStableFrames;
+  const peak =
+    targets.locked && targets.bestYaw !== null && targets.peakScore !== null
+      ? { yaw: targets.bestYaw, score: targets.peakScore }
+      : null;
+  const collapsing = qualityCollapsing(input.quality, peak, config);
 
   const fail: Omit<GuidanceResult, "prompt"> = {
     poseNear,
@@ -109,7 +123,8 @@ export function pickPrompt(
     return { ...fail, prompt: "BAD_LIGHT" };
   }
 
-  const allowCapture = poseReady && stable && qualityKind === "ok";
+  const allowCapture =
+    poseReady && stable && qualityKind === "ok" && !collapsing;
   if (allowCapture) {
     return { ...fail, prompt: "READY", allowCapture: true };
   }
@@ -120,10 +135,10 @@ export function evaluateGuidance(
   input: GuidanceInput,
   config: PoseConfig,
   side: EffectiveTargets["side"],
-  offset: number,
+  personalBest: PeakSample | null,
   stableFrames: number,
 ): GuidanceResult {
-  const targets = effectiveTargets(side, offset, config);
+  const targets = effectiveTargets(side, personalBest, config);
   return pickPrompt(input, config, targets, stableFrames);
 }
 

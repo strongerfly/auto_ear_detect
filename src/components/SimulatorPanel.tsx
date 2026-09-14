@@ -8,6 +8,8 @@ export type SimState = {
   pitch: number;
   roll: number;
   quality: EarQuality;
+  qualityFollowsYaw: boolean;
+  qualityPeakYaw: number;
 };
 
 export const DEFAULT_SIM: SimState = {
@@ -18,6 +20,8 @@ export const DEFAULT_SIM: SimState = {
   pitch: 0,
   roll: 0,
   quality: { laplacian: 180, brightness: 120, edgeEnergy: 40 },
+  qualityFollowsYaw: false,
+  qualityPeakYaw: 45,
 };
 
 export function SimulatorPanel({
@@ -50,6 +54,15 @@ export function SimulatorPanel({
           disabled={!sim.enabled}
         />
         画面中有脸
+      </label>
+      <label className="sim-row">
+        <input
+          type="checkbox"
+          checked={sim.qualityFollowsYaw}
+          onChange={(e) => set({ qualityFollowsYaw: e.target.checked })}
+          disabled={!sim.enabled}
+        />
+        质量随 yaw 变化（峰值可调，用于验证 45° 也能 READY）
       </label>
       <Slider
         label="yaw"
@@ -85,7 +98,15 @@ export function SimulatorPanel({
         onChange={(faceHeightRatio) => set({ faceHeightRatio })}
       />
       <Slider
-        label="清晰度"
+        label="质量峰值 yaw"
+        min={-100}
+        max={100}
+        value={sim.qualityPeakYaw}
+        disabled={!sim.enabled || !sim.qualityFollowsYaw}
+        onChange={(qualityPeakYaw) => set({ qualityPeakYaw })}
+      />
+      <Slider
+        label={sim.qualityFollowsYaw ? "峰值清晰度" : "清晰度"}
         min={0}
         max={400}
         value={sim.quality.laplacian}

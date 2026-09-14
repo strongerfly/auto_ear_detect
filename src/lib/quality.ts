@@ -82,6 +82,32 @@ export function measureEarQuality(image: ImageDataLike): EarQuality {
   };
 }
 
+/**
+ * Rank how frontal / ear-like an ROI looks. Laplacian variance is the
+ * focus/detail cue (helix folds); Sobel mean rewards visible contours vs a
+ * smooth cheek or hair blob. No extra symmetry term: left/right ROI energy
+ * is unstable under yaw and hair.
+ */
+export function frontalQualityScore(quality: EarQuality): number {
+  return quality.laplacian + 0.5 * quality.edgeEnergy;
+}
+
+/** Synthetic quality vs yaw (tests + pose simulator). Peak at `peakYaw`. */
+export function qualityAlongYawCurve(
+  yaw: number,
+  peakYaw: number,
+  peak: EarQuality,
+  sigmaDeg = 12,
+): EarQuality {
+  const d = yaw - peakYaw;
+  const scale = Math.exp(-(d * d) / (2 * sigmaDeg * sigmaDeg));
+  return {
+    laplacian: peak.laplacian * scale,
+    brightness: peak.brightness,
+    edgeEnergy: peak.edgeEnergy * scale,
+  };
+}
+
 export type QualityKind = "ok" | "hair" | "light";
 
 export function classifyEarQuality(

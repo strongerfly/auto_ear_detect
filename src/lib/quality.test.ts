@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { classifyEarQuality, measureEarQuality } from "./quality";
 import { poseConfig } from "../config";
+import {
+  classifyEarQuality,
+  frontalQualityScore,
+  measureEarQuality,
+  qualityAlongYawCurve,
+} from "./quality";
 
 function solid(
   w: number,
@@ -45,5 +50,15 @@ describe("ear ROI quality", () => {
     expect(q.laplacian).toBeGreaterThan(100);
     expect(q.edgeEnergy).toBeGreaterThan(15);
     expect(classifyEarQuality(q, poseConfig.earRoiQuality)).toBe("ok");
+    expect(frontalQualityScore(q)).toBeGreaterThan(100);
+  });
+
+  it("yaw curve peaks at the requested angle and drops at 80 when peak is 45", () => {
+    const peak = { laplacian: 180, brightness: 120, edgeEnergy: 40 };
+    const at45 = qualityAlongYawCurve(45, 45, peak);
+    const at80 = qualityAlongYawCurve(80, 45, peak);
+    expect(at45.laplacian).toBeCloseTo(180, 5);
+    expect(at80.laplacian).toBeLessThan(poseConfig.earRoiQuality.laplacianMin);
+    expect(frontalQualityScore(at45)).toBeGreaterThan(frontalQualityScore(at80));
   });
 });
