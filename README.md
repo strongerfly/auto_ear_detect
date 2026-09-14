@@ -1,10 +1,14 @@
 # auto_ear_detect
 
+[English](README.md) · [中文说明](README.zh-CN.md)
+
 [![CI](https://github.com/strongerfly/auto_ear_detect/actions/workflows/ci.yml/badge.svg)](https://github.com/strongerfly/auto_ear_detect/actions/workflows/ci.yml)
 
-Real-time **head-pose guided ear capture**. The webcam + MediaPipe Face Landmarker estimate yaw / pitch / roll, Chinese on-screen copy tells the user how to turn, and capture is gated until a frontal view of the chosen ear is stable and sharp.
+Real-time **head-pose guided ear capture**. The webcam + MediaPipe Face Landmarker estimate yaw / pitch / roll, on-screen copy tells the user how to turn, and capture is gated until a frontal view of the chosen ear is stable and sharp.
 
 Stack: **Vite + React + TypeScript** + `@mediapipe/tasks-vision` Face Landmarker (`VIDEO` mode, `outputFacialTransformationMatrixes: true`).
+
+The UI and guidance prompts are available in **中文** and **English**. Toggle **中文 / English** in the header. Preference is stored in `localStorage` key `auto-ear-detect:locale:v1`. Default: browser language `zh*` → Chinese, otherwise English.
 
 ## Run
 
@@ -14,7 +18,7 @@ npm test
 npm run dev
 ```
 
-Open the printed local URL (default http://localhost:5173). Allow the camera. Use **拍左耳** / **拍右耳**.
+Open the printed local URL (default http://localhost:5173). Allow the camera. Use **Left ear** / **Right ear** (or **拍左耳** / **拍右耳**). Expand **Instructions** / **使用说明** in the app for a short how-to.
 
 ```bash
 npm run build
@@ -48,7 +52,7 @@ Default targets (also in `src/config/pose-config.json`):
 1. The `<video>` (and overlay canvas) use `transform: scaleX(-1)` so a front camera feels like a mirror.
 2. Face Landmarker runs on the **raw, unmirrored** `HTMLVideoElement` buffer. CSS does not change those pixels.
 3. Saved stills are drawn from that unmirrored buffer, so anatomical left/right in the file match FISWG.
-4. Guidance copy (`请向左转头，露出右耳`) refers to the user’s **physical** left/right, not screen-left.
+4. Guidance copy (e.g. “Turn your head left to show the right ear” / `请向左转头，露出右耳`) refers to the user’s **physical** left/right, not screen-left.
 
 **Do not also negate yaw** to “compensate” for the CSS mirror — that would double-correct and swap sides.
 
@@ -63,7 +67,7 @@ Ready (button enabled + optional auto-shutter) only when all of:
 3. Stable for **12** frames with \|Δangle\| &lt; 3° on yaw, pitch, and roll
 4. Ear ROI quality: Laplacian ≥ 100, brightness 60–200, Sobel edge energy ≥ 15
 
-Guidance is a single Chinese line with **400 ms** dwell (anti-flicker). Priority:
+Guidance is a single on-screen line with **400 ms** dwell (anti-flicker). Priority:
 
 `NO_FACE` → distance → roll → pitch → yaw turn hints → hair/blur (`CLEAR_HAIR`) / light (`BAD_LIGHT`) → `HOLD_STILL` → `READY`
 
@@ -71,31 +75,32 @@ Guidance is a single Chinese line with **400 ms** dwell (anti-flicker). Priority
 
 Some ears sit at a slightly different profile angle. A per-side offset (clamped ±15°) is stored in `localStorage` key `auto-ear-detect:offset:v1`.
 
-**校准此侧偏移**: slowly turn while \|yaw\| is in 60–95°. The yaw at peak ear-ROI Laplacian becomes `offset = clamp(yawPeak − yawCenter, −15, 15)`. The yaw target band and turn-hint thresholds are translated by that offset, then clamped to a plausible profile range (~50–100° or −100–−50°).
+**Calibrate this side**: slowly turn while \|yaw\| is in 60–95°. The yaw at peak ear-ROI Laplacian becomes `offset = clamp(yawPeak − yawCenter, −15, 15)`. The yaw target band and turn-hint thresholds are translated by that offset, then clamped to a plausible profile range (~50–100° or −100–−50°).
 
 ## Tuning
 
-All numeric thresholds and Chinese strings live in **`src/config/pose-config.json`**. Restart/refresh after edits.
+Numeric thresholds live in **`src/config/pose-config.json`**. User-visible strings (guidance, buttons, help) live in **`src/i18n/`** and switch with the locale. Restart/refresh after editing thresholds.
 
 | Want… | Touch |
 |--------|--------|
 | Stricter “ready” | `captureBands.readyMaxAbsYawError` |
 | Less flicker | `promptUx.minDwellMs`, `smoothing.oneEuro` |
 | Harder sharpness gate | `earRoiQuality.laplacianMin` / `minEdgeEnergy` |
-| Different copy | `copy.*` |
+| Different copy | `src/i18n/messages.ts` |
 
 Smoothing is a One Euro filter (`minCutoff` 1.0, `beta` 0.007, `dCutoff` 1.0).
 
 ## Project layout
 
 ```
-src/config/pose-config.json   thresholds + Chinese copy
+src/config/pose-config.json   numeric thresholds (language-neutral)
+src/i18n/                     Chinese / English UI + guidance copy
 src/lib/euler.ts              matrix → YXZ → FISWG signs
 src/lib/guidance.ts           pickPrompt state machine
 src/lib/quality.ts            Laplacian / brightness / edges
 src/components/EarCaptureApp.tsx
 ```
 
-Unit tests (`npm test`) cover Euler round-trip, FISWG yaw sign, prompt priority, offset clamp, dwell, and ROI quality — no camera required.
+Unit tests (`npm test`) cover Euler round-trip, FISWG yaw sign, prompt priority, offset clamp, dwell, ROI quality, and locale lookup — no camera required.
 
-The in-app **姿态模拟器** feeds synthetic yaw/pitch/roll so you can exercise guidance without a webcam.
+The in-app **pose simulator** feeds synthetic yaw/pitch/roll so you can exercise guidance without a webcam.

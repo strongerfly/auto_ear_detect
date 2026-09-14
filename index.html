@@ -1,10 +1,26 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <title>耳廓引导拍摄</title>
+    <title>Head-pose ear capture</title>
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("auto-ear-detect:locale:v1");
+          var lang =
+            stored === "zh" || stored === "en"
+              ? stored
+              : (navigator.language || "").toLowerCase().indexOf("zh") === 0
+                ? "zh"
+                : "en";
+          document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+          document.title =
+            lang === "zh" ? "耳廓引导拍摄" : "Head-pose ear capture";
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -8,9 +8,12 @@ import {
 import type { FaceLandmarkerResult } from "@mediapipe/tasks-vision";
 import { poseConfig, type EarSide, type PromptKey } from "../config";
 import { AngleHud } from "./AngleHud";
+import { InstructionsPanel } from "./InstructionsPanel";
+import { LocaleSwitcher } from "./LocaleSwitcher";
 import { DEFAULT_SIM, SimulatorPanel, type SimState } from "./SimulatorPanel";
 import { useFaceLandmarker } from "../hooks/useFaceLandmarker";
 import { useWebcam } from "../hooks/useWebcam";
+import { useLocale } from "../i18n";
 import { dwellPrompt, INITIAL_DWELL, type DwellState } from "../lib/dwell";
 import { matrixToFiswgEuler } from "../lib/euler";
 import { evaluateGuidance, isAngleStable } from "../lib/guidance";
@@ -54,12 +57,15 @@ const INITIAL_LIVE: LiveState = {
 };
 
 export function EarCaptureApp() {
+  const { locale, t } = useLocale();
   const { videoRef, ready: camReady, error: camError, start, stop } =
     useWebcam();
   const { landmarker, error: lmError, loading: lmLoading } =
     useFaceLandmarker();
   const overlayRef = useRef<HTMLCanvasElement | null>(null);
   const sampleRef = useRef<HTMLCanvasElement | null>(null);
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const [side, setSide] = useState<EarSide>("rightEar");
   const [offsets, setOffsets] = useState<OffsetMap>(() => loadOffsets());
@@ -69,7 +75,7 @@ export function EarCaptureApp() {
   const [lastCapture, setLastCapture] = useState<string | null>(null);
   const [sim, setSim] = useState<SimState>(DEFAULT_SIM);
   const [live, setLive] = useState<LiveState>(INITIAL_LIVE);
-  const [status, setStatus] = useState("正在加载 Face Landmarker…");
+  const [status, setStatus] = useState(() => t("loadingLandmarker"));
 
   const sideRef = useRef(side);
   const offsetsRef = useRef(offsets);
@@ -96,7 +102,7 @@ export function EarCaptureApp() {
   }, []);
 
   const offset = offsets[side];
-  const promptText = poseConfig.copy[live.prompt];
+  const promptText = t(live.prompt);
 
   const liveRef = useRef(live);
   liveRef.current = live;
@@ -105,6 +111,7 @@ export function EarCaptureApp() {
     const video = videoRef.current;
     const canvas = document.createElement("canvas");
     const snap = liveRef.current;
+    const label = tRef.current;
     if (simRef.current.enabled || !video || video.readyState < 2) {
       canvas.width = 960;
       canvas.height = 540;
@@ -119,6 +126,8 @@ export function EarCaptureApp() {
         snap.yaw,
         snap.pitch,
         snap.roll,
+        label(sideRef.current === "rightEar" ? "simStillRight" : "simStillLeft"),
+        label(sideRef.current === "rightEar" ? "roiRight" : "roiLeft"),
       );
     } else {
       canvas.width = video.videoWidth;
@@ -136,11 +145,13 @@ export function EarCaptureApp() {
 
   useEffect(() => {
     if (!lmLoading && landmarker) {
-      setStatus("点击「打开摄像头」开始。前置预览已镜像，姿态按未翻转画面估计。");
+      setStatus(t("clickToStart"));
     } else if (lmError) {
-      setStatus(`模型加载失败：${lmError}。仍可用姿态模拟器。`);
+      setStatus(t("modelLoadFailed", { error: lmError }));
+    } else {
+      setStatus(t("loadingLandmarker"));
     }
-  }, [landmarker, lmError, lmLoading]);
+  }, [landmarker, lmError, lmLoading, t]);
 
   useEffect(() => {
     let raf = 0;
@@ -152,6 +163,9 @@ export function EarCaptureApp() {
       const simState = simRef.current;
       const video = videoRef.current;
       const overlay = overlayRef.current;
+      const roiLabel = tRef.current(
+        currentSide === "rightEar" ? "roiRight" : "roiLeft",
+      );
 
       let yaw: number | null = null;
       let pitch: number | null = null;
@@ -173,7 +187,7 @@ export function EarCaptureApp() {
         roll = simState.roll;
         quality = simState.quality;
         if (overlay) {
-          drawSimOverlay(overlay, currentSide, simState);
+          drawSimOverlay(overlay, currentSide, simState, roiLabel);
         }
       } else if (
         landmarker &&
@@ -244,6 +258,7 @@ export function EarCaptureApp() {
             video.videoHeight,
             roi,
             currentSide,
+            roiLabel,
           );
         }
       } else if (!simState.enabled && overlay && video && video.videoWidth) {
@@ -253,6 +268,7 @@ export function EarCaptureApp() {
           video.videoHeight,
           null,
           currentSide,
+          roiLabel,
         );
       }
 
@@ -370,42 +386,51 @@ export function EarCaptureApp() {
   };
 
   const stageHint = useMemo(() => {
-    if (sim.enabled) return "模拟模式";
-    if (camError) return `摄像头：${camError}`;
-    if (!camReady) return "摄像头未开启";
-    return "前置预览（CSS 镜像）· 推理用未翻转帧";
-  }, [camError, camReady, sim.enabled]);
+    if (sim.enabled) return t("simMode");
+    if (camError) return t("cameraError", { error: camError });
+    if (!camReady) return t("cameraOff");
+    return t("previewHint");
+  }, [camError, camReady, sim.enabled, t]);
+
+  const calibPeak =
+    calibBest.laplacian < 0
+      ? "—"
+      : `${calibBest.laplacian.toFixed(0)} @ ${calibBest.yaw.toFixed(1)}°`;
 
   return (
-    <div className="app">
+    <div className="app" data-locale={locale}>
       <header className="top">
         <div>
           <p className="eyebrow">Auto Ear Detect</p>
-          <h1>耳廓引导拍摄</h1>
+          <h1>{t("appTitle")}</h1>
         </div>
-        <div className="modes" role="tablist" aria-label="拍摄侧">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={side === "leftEar"}
-            className={side === "leftEar" ? "on" : ""}
-            onClick={() => setSide("leftEar")}
-          >
-            拍左耳
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={side === "rightEar"}
-            className={side === "rightEar" ? "on" : ""}
-            onClick={() => setSide("rightEar")}
-          >
-            拍右耳
-          </button>
+        <div className="top-actions">
+          <LocaleSwitcher />
+          <div className="modes" role="tablist" aria-label={t("sideAriaLabel")}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={side === "leftEar"}
+              className={side === "leftEar" ? "on" : ""}
+              onClick={() => setSide("leftEar")}
+            >
+              {t("shootLeftEar")}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={side === "rightEar"}
+              className={side === "rightEar" ? "on" : ""}
+              onClick={() => setSide("rightEar")}
+            >
+              {t("shootRightEar")}
+            </button>
+          </div>
         </div>
       </header>
 
       <p className="status">{status}</p>
+      <InstructionsPanel />
 
       <section className={`stage ${live.allowCapture ? "ready" : ""}`}>
         <video
@@ -433,10 +458,10 @@ export function EarCaptureApp() {
 
       <div className="dock">
         <button type="button" className="ghost" onClick={() => void start()}>
-          打开摄像头
+          {t("openCamera")}
         </button>
         <button type="button" className="ghost" onClick={stop}>
-          关闭
+          {t("closeCamera")}
         </button>
         <button
           type="button"
@@ -444,7 +469,7 @@ export function EarCaptureApp() {
           disabled={!live.allowCapture}
           onClick={captureStill}
         >
-          拍摄
+          {t("capture")}
         </button>
         <label className="check">
           <input
@@ -452,7 +477,7 @@ export function EarCaptureApp() {
             checked={autoShutter}
             onChange={(e) => setAutoShutter(e.target.checked)}
           />
-          自动快门
+          {t("autoShutter")}
         </label>
         <button
           type="button"
@@ -460,7 +485,7 @@ export function EarCaptureApp() {
           disabled={!lastCapture}
           onClick={downloadCapture}
         >
-          下载上次拍摄
+          {t("downloadLast")}
         </button>
       </div>
 
@@ -468,47 +493,42 @@ export function EarCaptureApp() {
         {calibrating ? (
           <>
             <span className="calib-note">
-              请慢慢转头（|yaw| 60–95°），峰值清晰度{" "}
-              {calibBest.laplacian < 0 ? "—" : calibBest.laplacian.toFixed(0)}
-              {calibBest.laplacian >= 0
-                ? ` @ ${calibBest.yaw.toFixed(1)}°`
-                : ""}
+              {t("calibNote", { peak: calibPeak })}
             </span>
             <button type="button" className="ghost" onClick={finishCalibration}>
-              完成校准
+              {t("finishCalibrate")}
             </button>
           </>
         ) : (
           <button type="button" className="ghost" onClick={startCalibration}>
-            校准此侧偏移
+            {t("calibrate")}
           </button>
         )}
         <button type="button" className="ghost" onClick={clearOffset}>
-          清除此侧偏移
+          {t("clearOffset")}
         </button>
         {live.quality ? (
           <span className="calib-note">
-            耳区 Laplacian {live.quality.laplacian.toFixed(0)} · 亮度{" "}
-            {live.quality.brightness.toFixed(0)} · 边缘{" "}
-            {live.quality.edgeEnergy.toFixed(0)}
+            {t("qualityNote", {
+              laplacian: live.quality.laplacian.toFixed(0),
+              brightness: live.quality.brightness.toFixed(0),
+              edge: live.quality.edgeEnergy.toFixed(0),
+            })}
           </span>
         ) : null}
       </div>
 
       {lastCapture ? (
         <figure className="preview">
-          <figcaption>上次拍摄（未镜像，解剖左右）</figcaption>
-          <img src={lastCapture} alt="上次拍摄的耳部照片" />
+          <figcaption>{t("lastCaptureCaption")}</figcaption>
+          <img src={lastCapture} alt={t("lastCaptureAlt")} />
         </figure>
       ) : null}
 
       <SimulatorPanel sim={sim} onChange={setSim} />
 
       <footer className="foot">
-        <p>
-          FISWG：+yaw 露右耳，−yaw 露左耳。Euler 顺序 YXZ。阈值见{" "}
-          <code>src/config/pose-config.json</code>。
-        </p>
+        <p>{t("footer")}</p>
       </footer>
     </div>
   );
@@ -520,6 +540,7 @@ function drawCameraOverlay(
   height: number,
   roi: RoiBox | null,
   side: EarSide,
+  roiLabel: string,
 ) {
   if (canvas.width !== width) canvas.width = width;
   if (canvas.height !== height) canvas.height = height;
@@ -532,18 +553,14 @@ function drawCameraOverlay(
   ctx.strokeRect(roi.x, roi.y, roi.w, roi.h);
   ctx.font = `${Math.max(18, width / 45)}px ui-sans-serif, sans-serif`;
   ctx.fillStyle = ctx.strokeStyle;
-  fillUnmirroredText(
-    ctx,
-    side === "rightEar" ? "右耳 ROI" : "左耳 ROI",
-    roi.x + 8,
-    roi.y + 28,
-  );
+  fillUnmirroredText(ctx, roiLabel, roi.x + 8, roi.y + 28);
 }
 
 function drawSimOverlay(
   canvas: HTMLCanvasElement,
   side: EarSide,
   sim: SimState,
+  roiLabel: string,
 ) {
   const width = 960;
   const height = 540;
@@ -573,12 +590,7 @@ function drawSimOverlay(
   ctx.strokeRect(roiX, 180, 140, 180);
   ctx.fillStyle = "#5ee0b5";
   ctx.font = "20px ui-sans-serif, sans-serif";
-  fillUnmirroredText(
-    ctx,
-    side === "rightEar" ? "右耳 ROI" : "左耳 ROI",
-    roiX + 8,
-    170,
-  );
+  fillUnmirroredText(ctx, roiLabel, roiX + 8, 170);
 }
 
 /** Canvas is CSS-mirrored with the selfie preview; pre-flip glyphs so they read LTR. */
@@ -605,16 +617,14 @@ function drawSimStill(
   yaw: number | null,
   pitch: number | null,
   roll: number | null,
+  title: string,
+  roiLabel: string,
 ) {
   ctx.fillStyle = "#e7f4ee";
   ctx.fillRect(0, 0, width, height);
   ctx.fillStyle = "#0b1210";
   ctx.font = "32px ui-sans-serif, sans-serif";
-  ctx.fillText(
-    side === "rightEar" ? "右耳 · 模拟拍摄" : "左耳 · 模拟拍摄",
-    40,
-    56,
-  );
+  ctx.fillText(title, 40, 56);
   ctx.font = "22px ui-sans-serif, sans-serif";
   ctx.fillText(
     `yaw ${yaw?.toFixed(1) ?? "—"}°   pitch ${pitch?.toFixed(1) ?? "—"}°   roll ${roll?.toFixed(1) ?? "—"}°`,
@@ -642,5 +652,5 @@ function drawSimStill(
   ctx.strokeRect(roiX, 180, 140, 180);
   ctx.fillStyle = "#1a4f43";
   ctx.font = "20px ui-sans-serif, sans-serif";
-  ctx.fillText(side === "rightEar" ? "右耳 ROI" : "左耳 ROI", roiX + 8, 170);
+  ctx.fillText(roiLabel, roiX + 8, 170);
 }

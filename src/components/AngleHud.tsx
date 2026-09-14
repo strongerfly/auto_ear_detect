@@ -1,5 +1,5 @@
 import type { PromptKey } from "../config";
-import { poseConfig } from "../config";
+import { useLocale } from "../i18n";
 
 export function AngleHud({
   yaw,
@@ -14,6 +14,7 @@ export function AngleHud({
   offset: number;
   prompt: PromptKey | null;
 }) {
+  const { t } = useLocale();
   const fmt = (v: number | null) =>
     v === null || Number.isNaN(v) ? "—" : v.toFixed(1);
   return (
@@ -28,11 +29,13 @@ export function AngleHud({
         roll <strong>{fmt(roll)}°</strong>
       </span>
       <span>
-        偏移 <strong>{offset >= 0 ? "+" : ""}{offset.toFixed(1)}°</strong>
+        {t("hudOffset")}{" "}
+        <strong>
+          {offset >= 0 ? "+" : ""}
+          {offset.toFixed(1)}°
+        </strong>
       </span>
-      {prompt ? (
-        <span className="hud-state">{poseConfig.copy[prompt]}</span>
-      ) : null}
+      {prompt ? <span className="hud-state">{t(prompt)}</span> : null}
     </div>
   );
 }

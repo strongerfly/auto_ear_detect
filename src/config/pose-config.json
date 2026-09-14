@@ -2,7 +2,7 @@
   "version": 1,
   "coordinateConvention": {
     "yawPositive": "rightEarVisible",
-    "note": "FISWG: +yaw 露右耳，-yaw 露左耳。实现时用真机标定矩阵→Euler 符号，使与此一致。",
+    "note": "FISWG: +yaw shows the right ear, -yaw the left. Calibrate matrix→Euler signs to match. User-visible copy lives in src/i18n, not here.",
     "eulerOrder": "YXZ",
     "units": "degrees"
   },
@@ -58,23 +58,5 @@
     "brightnessMax": 200,
     "minEdgeEnergy": 15
   },
-  "promptUx": { "minDwellMs": 400, "onlyOnePrompt": true },
-  "copy": {
-    "NO_FACE": "请把脸移入取景框",
-    "TOO_FAR": "请靠近一点",
-    "TOO_CLOSE": "请稍远一点",
-    "FIX_ROLL": "请摆正脑袋，不要歪头",
-    "PITCH_DOWN": "请稍微低头",
-    "PITCH_UP": "请稍微抬头",
-    "TURN_LEFT": "请向左转头，露出右耳",
-    "TURN_LEFT_MORE": "再向左转一点",
-    "TURN_LEFT_BACK": "转得有点过了，往回一点",
-    "TURN_RIGHT": "请向右转头，露出左耳",
-    "TURN_RIGHT_MORE": "再向右转一点",
-    "TURN_RIGHT_BACK": "转得有点过了，往回一点",
-    "CLEAR_HAIR": "请把耳边头发拨开",
-    "HOLD_STILL": "很好，请保持不动",
-    "BAD_LIGHT": "光线不太好，换亮一点的地方",
-    "READY": "可以拍了"
-  }
+  "promptUx": { "minDwellMs": 400, "onlyOnePrompt": true }
 }

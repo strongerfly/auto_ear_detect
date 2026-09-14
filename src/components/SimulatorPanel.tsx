@@ -1,4 +1,5 @@
 import type { EarQuality } from "../lib/types";
+import { useLocale } from "../i18n";
 
 export type SimState = {
   enabled: boolean;
@@ -27,20 +28,21 @@ export function SimulatorPanel({
   sim: SimState;
   onChange: (next: SimState) => void;
 }) {
+  const { t } = useLocale();
   const set = (patch: Partial<SimState>) => onChange({ ...sim, ...patch });
   const setQ = (patch: Partial<EarQuality>) =>
     onChange({ ...sim, quality: { ...sim.quality, ...patch } });
 
   return (
     <details className="sim" open={sim.enabled}>
-      <summary>姿态模拟器（无摄像头时可验证引导）</summary>
+      <summary>{t("simSummary")}</summary>
       <label className="sim-row">
         <input
           type="checkbox"
           checked={sim.enabled}
           onChange={(e) => set({ enabled: e.target.checked })}
         />
-        启用模拟
+        {t("simEnable")}
       </label>
       <label className="sim-row">
         <input
@@ -49,7 +51,7 @@ export function SimulatorPanel({
           onChange={(e) => set({ hasFace: e.target.checked })}
           disabled={!sim.enabled}
         />
-        画面中有脸
+        {t("simHasFace")}
       </label>
       <Slider
         label="yaw"
@@ -76,7 +78,7 @@ export function SimulatorPanel({
         onChange={(roll) => set({ roll })}
       />
       <Slider
-        label="脸高比"
+        label={t("simFaceHeight")}
         min={0.1}
         max={0.9}
         step={0.01}
@@ -85,7 +87,7 @@ export function SimulatorPanel({
         onChange={(faceHeightRatio) => set({ faceHeightRatio })}
       />
       <Slider
-        label="清晰度"
+        label={t("simSharpness")}
         min={0}
         max={400}
         value={sim.quality.laplacian}
@@ -93,7 +95,7 @@ export function SimulatorPanel({
         onChange={(laplacian) => setQ({ laplacian })}
       />
       <Slider
-        label="亮度"
+        label={t("simBrightness")}
         min={0}
         max={255}
         value={sim.quality.brightness}
