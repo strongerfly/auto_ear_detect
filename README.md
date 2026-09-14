@@ -92,7 +92,7 @@ Numeric thresholds: **`src/config/pose-config.json`**. User-visible strings: **`
 |--------|--------|
 | Search / preferred band | `search.yawAbsMin` / `yawAbsMax` / `preferredAbs*` |
 | READY vs personal peak | `ready.bandDegAroundBest`, `ready.scoreRatioOfBest` |
-| Less flicker | `promptUx.minDwellMs`, `crossFamilyDwellMs`, `smoothing.oneEuro` |
+| Less flicker | `promptUx.minDwellMs`, `crossFamilyDwellMs`, `slowDownPreemptMs`, `smoothing.oneEuro` |
 | Sharpness floor | `score.sharp`, `score.struct` |
 | Copy | `src/i18n/messages.ts` |
 
