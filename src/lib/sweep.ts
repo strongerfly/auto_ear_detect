@@ -21,3 +21,14 @@ export function extendSweepAbs(
     maxAbs: maxAbs === null ? abs : Math.max(maxAbs, abs),
   };
 }
+
+/** After relearn, ignore peak updates until the head actually moves. */
+export function stillResweeping(
+  fromYaw: number | null,
+  yaw: number | null,
+  minMoveDeg: number,
+): boolean {
+  if (fromYaw === null) return false;
+  if (yaw === null) return true;
+  return Math.abs(yaw - fromYaw) < minMoveDeg;
+}

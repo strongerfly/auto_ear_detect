@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extendSweepAbs, sweepCoverageRatio } from "./sweep";
+import { extendSweepAbs, stillResweeping, sweepCoverageRatio } from "./sweep";
 import { poseConfig } from "../config";
 
 describe("sweep coverage", () => {
@@ -28,5 +28,12 @@ describe("sweep coverage", () => {
     expect(
       sweepCoverageRatio(b.minAbs, b.maxAbs, band.yawAbsMin, band.yawAbsMax),
     ).toBeGreaterThan(poseConfig.search.minSweepCoverageRatio);
+  });
+
+  it("relearn holds the peak until yaw actually moves", () => {
+    expect(stillResweeping(45, 45, 8)).toBe(true);
+    expect(stillResweeping(45, 48, 8)).toBe(true);
+    expect(stillResweeping(45, 54, 8)).toBe(false);
+    expect(stillResweeping(null, 45, 8)).toBe(false);
   });
 });

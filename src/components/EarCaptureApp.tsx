@@ -31,7 +31,7 @@ import {
   type ShutterPhase,
   type ShutterState,
 } from "../lib/shutter";
-import { extendSweepAbs, sweepCoverageRatio } from "../lib/sweep";
+import { extendSweepAbs, stillResweeping, sweepCoverageRatio } from "../lib/sweep";
 import { EulerSmoother } from "../lib/one-euro";
 import {
   loadPersonalBests,
@@ -108,6 +108,7 @@ export function EarCaptureApp() {
   const sweepMinAbs = useRef<number | null>(null);
   const sweepMaxAbs = useRef<number | null>(null);
   const wrongSideStreak = useRef(0);
+  const resweepFromYaw = useRef<number | null>(null);
 
   sideRef.current = side;
   bestsRef.current = bests;
@@ -133,6 +134,7 @@ export function EarCaptureApp() {
     sweepMinAbs.current = null;
     sweepMaxAbs.current = null;
     wrongSideStreak.current = 0;
+    resweepFromYaw.current = null;
     smootherRef.current?.reset();
     setLive({
       ...INITIAL_LIVE,
@@ -368,20 +370,30 @@ export function EarCaptureApp() {
       }
 
       // Pause scoring/stability already reset above; keep bestYaw (do not clear).
-      if (hasFace && angles && quality) {
-        const prevPeak = bestsRef.current[currentSide];
-        const nextPeak = updatePersonalBest(prevPeak, {
-          yaw: angles.yaw,
-          pitch: angles.pitch,
-          roll: angles.roll,
-          quality,
-          side: currentSide,
-        });
-        if (nextPeak !== prevPeak) {
-          const nextMap = { ...bestsRef.current, [currentSide]: nextPeak };
-          bestsRef.current = nextMap;
-          setBests(nextMap);
-          savePersonalBests(nextMap);
+      // Relearn: do not immediately re-lock the same pose — user must actually resweep.
+      if (
+        !stillResweeping(
+          resweepFromYaw.current,
+          yaw,
+          poseConfig.ready.exitBandDeg,
+        )
+      ) {
+        resweepFromYaw.current = null;
+        if (hasFace && angles && quality) {
+          const prevPeak = bestsRef.current[currentSide];
+          const nextPeak = updatePersonalBest(prevPeak, {
+            yaw: angles.yaw,
+            pitch: angles.pitch,
+            roll: angles.roll,
+            quality,
+            side: currentSide,
+          });
+          if (nextPeak !== prevPeak) {
+            const nextMap = { ...bestsRef.current, [currentSide]: nextPeak };
+            bestsRef.current = nextMap;
+            setBests(nextMap);
+            savePersonalBests(nextMap);
+          }
         }
       }
 
@@ -515,7 +527,9 @@ export function EarCaptureApp() {
     bestsRef.current = next;
     setBests(next);
     savePersonalBests(next);
+    const fromYaw = live.yaw ?? lastAngles.current?.yaw ?? 0;
     resetTransient(side);
+    resweepFromYaw.current = fromYaw;
   };
 
   const downloadCapture = () => {
@@ -668,6 +682,13 @@ export function EarCaptureApp() {
           >
             {t("autoshutterCancel")}
           </button>
+        ) : null}
+        {live.shutterPhase === "countdown" && live.countdownLeftMs > 0 ? (
+          <span className="shutter-count-dock">
+            {t("autoshutterCountdown", {
+              n: Math.max(1, Math.ceil(live.countdownLeftMs / 1000)),
+            })}
+          </span>
         ) : null}
         <button
           type="button"
