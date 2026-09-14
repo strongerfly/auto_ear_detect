@@ -58,6 +58,7 @@ type LiveState = {
   shutterCountdownMs: number | null;
   stuck: boolean;
   softReady: boolean;
+  captured: boolean;
 };
 
 const INITIAL_LIVE: LiveState = {
@@ -72,6 +73,7 @@ const INITIAL_LIVE: LiveState = {
   shutterCountdownMs: null,
   stuck: false,
   softReady: false,
+  captured: false,
 };
 
 export function EarCaptureApp() {
@@ -111,8 +113,10 @@ export function EarCaptureApp() {
   const lastVideoTime = useRef(-1);
   const smootherRef = useRef<EulerSmoother | null>(null);
   const readyBurst = useRef(0);
-  const progressRef = useRef(createProgress(0));
-  const introUntilRef = useRef(0);
+  const bootNow =
+    typeof performance !== "undefined" ? performance.now() : 0;
+  const progressRef = useRef(createProgress(bootNow));
+  const introUntilRef = useRef(sideIntroUntil(bootNow));
   const sweepRef = useRef(EMPTY_SWEEP);
   const capturedThisSideRef = useRef(false);
 
@@ -174,7 +178,12 @@ export function EarCaptureApp() {
   }, []);
 
   const personalBest = bests[side];
-  const promptText = t(live.prompt);
+  const promptText =
+    live.captured && !live.stuck
+      ? captureFeedback?.grade === "offPeak"
+        ? t("captureOffPeak")
+        : t("captureNearPeak")
+      : t(live.prompt);
 
   const liveRef = useRef(live);
   liveRef.current = live;
@@ -494,11 +503,17 @@ export function EarCaptureApp() {
         captureStillRef.current();
       }
 
+      const captured = capturedThisSideRef.current;
+      let displayPrompt: PromptKey = promptForDisplay(shown, allowCapture);
+      if (captured && !stuck) {
+        displayPrompt = liveRef.current.prompt;
+      }
+
       setLive({
         yaw,
         pitch,
         roll,
-        prompt: promptForDisplay(shown, allowCapture),
+        prompt: displayPrompt,
         allowCapture,
         roi,
         quality,
@@ -506,6 +521,7 @@ export function EarCaptureApp() {
         shutterCountdownMs: shutter.fire ? null : shutter.remainingMs,
         stuck,
         softReady: allowCapture && guidance.prompt === "SOFT_READY",
+        captured,
       });
     };
 
@@ -631,6 +647,7 @@ export function EarCaptureApp() {
           data-ready={live.allowCapture && !live.softReady}
           data-soft={live.softReady}
           data-stuck={live.stuck}
+          data-captured={live.captured && !live.stuck}
         >
           {promptText}
         </div>

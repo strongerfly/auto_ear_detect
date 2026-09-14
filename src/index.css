@@ -218,10 +218,10 @@ h1 {
   background: var(--warn);
 }
 
-.prompt[data-stuck="true"] {
+.prompt[data-captured="true"] {
   color: var(--ink);
-  background: rgba(239, 139, 115, 0.2);
-  border: 1px solid var(--danger);
+  background: rgba(62, 224, 184, 0.22);
+  border: 1px solid var(--accent);
 }
 
 .stage-tag {

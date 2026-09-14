@@ -81,7 +81,7 @@
     "minDwellMs": 400,
     "crossFamilyDwellMs": 700,
     "readyPromoteMs": 200,
-    "sideIntroMs": 1800,
+    "sideIntroMs": 2800,
     "onlyOnePrompt": true
   },
   "failure": {

@@ -12,15 +12,10 @@ export function sideIntroUntil(
   return nowMs + introMs;
 }
 
-const INTRO_PREEMPT: ReadonlySet<PromptKey> = new Set([
-  "WRONG_SIDE",
-  "STUCK_NO_PROGRESS",
-]);
-
 /**
- * After a left/right switch, keep the body-side intro on screen briefly.
- * Wrong-way turns still interrupt; face-missing stays on the intro so the
- * user knows which ear they just selected.
+ * After a left/right switch, keep the body-side intro on screen for the
+ * whole intro window so the user sees which ear they just picked (body L/R).
+ * Stuck recovery can still interrupt.
  */
 export function pickPromptDuringIntro(
   nowMs: number,
@@ -29,7 +24,7 @@ export function pickPromptDuringIntro(
   guidancePrompt: PromptKey,
 ): PromptKey {
   if (nowMs >= introUntilMs) return guidancePrompt;
-  if (INTRO_PREEMPT.has(guidancePrompt)) return guidancePrompt;
+  if (guidancePrompt === "STUCK_NO_PROGRESS") return guidancePrompt;
   return introPrompt;
 }
 

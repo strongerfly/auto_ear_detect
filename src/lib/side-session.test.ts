@@ -15,7 +15,7 @@ describe("side switch intro", () => {
     expect(introPromptFor("rightEar")).toBe("INTRO_RIGHT");
   });
 
-  it("holds the intro until the dwell window, except wrong-way", () => {
+  it("holds the intro until the dwell window, including wrong-way", () => {
     const until = sideIntroUntil(0, 1800);
     expect(
       pickPromptDuringIntro(500, until, "INTRO_RIGHT", "SWEEP_RIGHT_EAR"),
@@ -25,10 +25,13 @@ describe("side switch intro", () => {
     ).toBe("INTRO_RIGHT");
     expect(
       pickPromptDuringIntro(500, until, "INTRO_RIGHT", "WRONG_SIDE"),
-    ).toBe("WRONG_SIDE");
+    ).toBe("INTRO_RIGHT");
     expect(
       pickPromptDuringIntro(1800, until, "INTRO_RIGHT", "SWEEP_RIGHT_EAR"),
     ).toBe("SWEEP_RIGHT_EAR");
+    expect(
+      pickPromptDuringIntro(500, until, "INTRO_RIGHT", "STUCK_NO_PROGRESS"),
+    ).toBe("STUCK_NO_PROGRESS");
   });
 });
 
