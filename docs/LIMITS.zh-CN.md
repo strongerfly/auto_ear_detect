@@ -131,3 +131,11 @@ Capture mode: `qualityPeakYaw`（`src/config/pose-config.json`）。READY **不�
 6. 不要求 yaw ∈ [70, 90]；不要求用户确认  
 
 引导：一条短提示，中英可切换。远了只说转向（慢慢找最清楚的角度 / 再转一点点 / 往回一点），靠近了才提头发、光线、摆头。READY 切换更快，避免提示像清单一样刷。
+
+## 交互覆盖（本 PR）
+
+`src/lib/guidance.test.ts` 里 `interaction coverage (coherent pass)` 以及原有套件锁住：
+
+转不够 → TURN_MORE；过了**个人**峰值 → TURN_BACK；往峰值靠近时 HOLD（不是 TURN_MORE）；两侧 WRONG_SIDE；roll 再 pitch 再 yaw；头发 / 过亮 / 转太快；脸跟丢**保留** `bestYaw`；太近/太远；平坦分数曲线仍按更小 \|yaw\| READY；重新学习（峰值清空）走扫掠不能拍；~45° 峰值可以拍；单独 70–90 不能拍。
+
+**不当硬门（见短板）：** `minSweepCoverageRatio` 0.6、`flatPeakRangeDeg` 25（用近同分 + 92% 分）、没有单独的 ROI 出框提示（太近 / 靠近峰值时 CLEAR_HAIR）、`wrongSideFrames`（400ms 停留当去抖）。

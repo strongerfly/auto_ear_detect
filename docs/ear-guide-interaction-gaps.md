@@ -2,6 +2,8 @@
 
 Checklist for quality-peak capture. **North star: best interaction, not rigid tables.** Absolute target yaw is not shown in the normal UI.
 
+Unit tests: `src/lib/guidance.test.ts` → `interaction coverage (coherent pass)`.
+
 P0/P1 items below are implemented on this branch unless marked leftover.
 
 ## P0 — must

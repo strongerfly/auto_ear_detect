@@ -588,6 +588,144 @@ describe("QA precheck: search 35–90, READY ±5°, never 70–90 alone", () => 
   });
 });
 
+describe("interaction coverage (coherent pass)", () => {
+  it("under-rotate past a locked peak → TURN_MORE", () => {
+    expect(
+      evaluateGuidance(base({ yaw: 38 }), poseConfig, "rightEar", peakAt(45), 0)
+        .prompt,
+    ).toBe("TURN_MORE");
+  });
+
+  it("over-rotate past personal best → TURN_BACK; approaching the peak HOLDs", () => {
+    const best = peakAt(45);
+    expect(
+      evaluateGuidance(base({ yaw: 55 }), poseConfig, "rightEar", best, 0).prompt,
+    ).toBe("TURN_BACK");
+    const hold = evaluateGuidance(base({ yaw: 48 }), poseConfig, "rightEar", best, 3);
+    expect(hold.prompt).toBe("HOLD_NEAR_PEAK");
+    expect(hold.prompt).not.toBe("TURN_MORE");
+    expect(hold.allowCapture).toBe(false);
+  });
+
+  it("wrong side / reverse turn on both ears", () => {
+    expect(
+      evaluateGuidance(base({ yaw: -20 }), poseConfig, "rightEar", null, 0).prompt,
+    ).toBe("WRONG_SIDE");
+    expect(
+      evaluateGuidance(base({ yaw: 20 }), poseConfig, "leftEar", null, 0).prompt,
+    ).toBe("WRONG_SIDE");
+  });
+
+  it("hair / bad light / too fast near the peak", () => {
+    const best = peakAt(45);
+    expect(
+      evaluateGuidance(
+        base({
+          yaw: 45,
+          quality: { laplacian: 10, brightness: 120, edgeEnergy: 4 },
+        }),
+        poseConfig,
+        "rightEar",
+        best,
+        0,
+      ).prompt,
+    ).toBe("CLEAR_HAIR");
+    expect(
+      evaluateGuidance(
+        base({
+          yaw: 45,
+          quality: { laplacian: 180, brightness: 220, edgeEnergy: 40 },
+        }),
+        poseConfig,
+        "rightEar",
+        best,
+        0,
+      ).prompt,
+    ).toBe("TOO_BRIGHT");
+    expect(
+      evaluateGuidance(base({ yaw: 20 }), poseConfig, "rightEar", null, 0, {
+        yawDelta: 20,
+      }).prompt,
+    ).toBe("SLOW_DOWN");
+  });
+
+  it("face lost keeps the locked peak (caller must not clear bestYaw)", () => {
+    const best = peakAt(45);
+    const r = evaluateGuidance(
+      base({ hasFace: false, yaw: 45 }),
+      poseConfig,
+      "rightEar",
+      best,
+      0,
+      { hadTrackedFace: true },
+    );
+    expect(r.prompt).toBe("FAIL_TRACKING");
+    expect(r.allowCapture).toBe(false);
+    expect(r.targets.bestYaw).toBe(45);
+    expect(r.targets.locked).toBe(true);
+  });
+
+  it("too near / far", () => {
+    expect(
+      evaluateGuidance(base({ faceHeightRatio: 0.1 }), poseConfig, "rightEar", null, 0)
+        .prompt,
+    ).toBe("TOO_FAR");
+    expect(
+      evaluateGuidance(base({ faceHeightRatio: 0.8 }), poseConfig, "rightEar", null, 0)
+        .prompt,
+    ).toBe("TOO_CLOSE");
+  });
+
+  it("flat score curve still locks the smaller |yaw| and can READY; relearn is sweep", () => {
+    const even: EarQuality = { laplacian: 160, brightness: 120, edgeEnergy: 40 };
+    let best: PeakSample | null = null;
+    for (const yaw of [40, 45, 55, 70]) {
+      best = updatePersonalBest(best, {
+        yaw,
+        pitch: 0,
+        roll: 0,
+        quality: even,
+        side: "rightEar",
+      });
+    }
+    expect(best?.yaw).toBe(40);
+    const ready = evaluateGuidance(
+      base({ yaw: 40, quality: even }),
+      poseConfig,
+      "rightEar",
+      best,
+      12,
+    );
+    expect(ready.prompt).toBe("READY");
+    expect(ready.phase).toBe("ready");
+    const afterRelearn = evaluateGuidance(
+      base({ yaw: 40, quality: even }),
+      poseConfig,
+      "rightEar",
+      null,
+      12,
+    );
+    expect(afterRelearn.allowCapture).toBe(false);
+    expect(afterRelearn.prompt).toBe("SWEEP_RIGHT_EAR");
+    expect(afterRelearn.phase).toBe("learning");
+  });
+
+  it("READY only near the personal best — never a lone 70–90 hold", () => {
+    const at45 = evaluateGuidance(
+      base({ yaw: 45 }),
+      poseConfig,
+      "rightEar",
+      peakAt(45),
+      12,
+    );
+    expect(at45.prompt).toBe("READY");
+    expect(at45.allowCapture).toBe(true);
+    const lone80 = evaluateGuidance(base({ yaw: 80 }), poseConfig, "rightEar", null, 12);
+    expect(lone80.allowCapture).toBe(false);
+    expect(lone80.prompt).toBe("SWEEP_RIGHT_EAR");
+  });
+});
+
 describe("prompt dwell", () => {
   it("shows first prompt immediately, then waits 400ms", () => {
     const a = dwellPrompt(INITIAL_DWELL, "NO_FACE", 0, 400);

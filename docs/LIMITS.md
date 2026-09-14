@@ -131,3 +131,11 @@ These are the gates before the next optimizations are honest, not aspirational:
 6. No yaw ∈ [70, 90] requirement; no user confirm  
 
 Guidance is one short line (中文 / English in the app). While the user is still turning we only talk about direction; hair / light / roll wait until they are close. READY promotes faster so prompts do not feel like a checklist.
+
+## Interaction coverage (this PR)
+
+Unit tests in `src/lib/guidance.test.ts` (`interaction coverage (coherent pass)` plus the older suites) lock:
+
+under-rotate → TURN_MORE; over-rotate past **personal** best → TURN_BACK; approaching the peak HOLDs (not TURN_MORE); wrong-side both ears; roll then pitch then yaw; hair / too-bright / too-fast; face lost **keeps** `bestYaw`; too near/far; flat score curve still READYs at the smaller \|yaw\|; relearn (null peak) is sweep not READY; ~45° peak READYs; 70–90 alone does not.
+
+**Not a hard gate (see 短板):** `minSweepCoverageRatio` 0.6, `flatPeakRangeDeg` 25 (tie-break + 92% score ratio instead), ROI-clipped ear with no dedicated prompt (too-close / CLEAR_HAIR when near peak), `wrongSideFrames` (400ms dwell is the debounce).

@@ -71,7 +71,7 @@ const zh: Messages = {
   SWEEP_RIGHT_EAR: "拍右耳：慢慢向左转，找到耳朵最清楚的角度",
   SWEEP_LEFT_EAR: "拍左耳：慢慢向右转，找到耳朵最清楚的角度",
   TURN_MORE: "再转一点点",
-  TURN_BACK: "往回一点，朝更清楚的那边",
+  TURN_BACK: "往回一点，刚才那边更清楚",
   TURN_BACK_OVERSHOOT: "到头了，往回一点",
   SLOW_DOWN: "转慢一点",
   WRONG_SIDE: "方向反了，按提示转，不要跟着镜子反着来",
