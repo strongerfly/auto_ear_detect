@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { poseConfig } from "../config";
-import { captureUiFor, evaluateGuidance, promptForDisplay } from "./guidance";
+import {
+  captureHintKey,
+  captureUiFor,
+  evaluateGuidance,
+  promptForDisplay,
+} from "./guidance";
 import { dwellMsFor, dwellPrompt, INITIAL_DWELL } from "./dwell";
 import { effectiveTargets } from "./effective-targets";
 import {
@@ -528,6 +533,10 @@ describe("quality-driven personal best yaw", () => {
     expect(captureUiFor(false, false)).toBe("learning");
     expect(captureUiFor(true, false)).toBe("hold");
     expect(captureUiFor(true, true)).toBe("ready");
+    expect(captureHintKey("learning")).toBe("learningNote");
+    expect(captureHintKey("hold")).toBe("NEAR_PEAK");
+    expect(captureHintKey("hold")).not.toBe("HOLD_STILL");
+    expect(captureHintKey("ready")).toBe("READY");
     const learning = evaluateGuidance(
       base({ yaw: 45 }),
       poseConfig,
@@ -542,6 +551,12 @@ describe("quality-driven personal best yaw", () => {
     expect(captureUiFor(learning.targets.locked, learning.allowCapture)).toBe(
       "learning",
     );
+    const near = evaluateGuidance(base(), poseConfig, "rightEar", peakAt(60), 3);
+    expect(near.allowCapture).toBe(false);
+    expect(captureUiFor(near.targets.locked, near.allowCapture)).toBe("hold");
+    expect(
+      captureHintKey(captureUiFor(near.targets.locked, near.allowCapture)),
+    ).toBe("NEAR_PEAK");
   });
 
   it("prior is a soft center until a peak is locked; 45 is not refused", () => {

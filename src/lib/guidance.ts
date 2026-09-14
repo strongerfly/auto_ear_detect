@@ -42,6 +42,9 @@ export type GuidanceExtras = {
 
 export type CaptureUiState = "learning" | "hold" | "ready";
 
+/** Copy key for the shutter hint. Grey hold is NEAR_PEAK, never HOLD_STILL. */
+export type CaptureHintKey = "READY" | "NEAR_PEAK" | "learningNote";
+
 export function captureUiFor(
   locked: boolean,
   allowCapture: boolean,
@@ -49,6 +52,13 @@ export function captureUiFor(
   if (allowCapture) return "ready";
   if (locked) return "hold";
   return "learning";
+}
+
+export function captureHintKey(ui: CaptureUiState): CaptureHintKey {
+  if (ui === "ready") return "READY";
+  // Locked-near-peak, shutter still grey: same family as returning-toward-best HOLD.
+  if (ui === "hold") return "NEAR_PEAK";
+  return "learningNote";
 }
 
 export type GuidanceResult = {

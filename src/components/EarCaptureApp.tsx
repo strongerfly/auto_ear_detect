@@ -17,7 +17,7 @@ import { useLocale } from "../i18n";
 import { countdownSeconds, stepAutoShutter } from "../lib/auto-shutter";
 import { dwellPrompt, INITIAL_DWELL, type DwellState } from "../lib/dwell";
 import { matrixToFiswgEuler } from "../lib/euler";
-import { captureUiFor, evaluateGuidance, isAngleStable, promptForDisplay } from "../lib/guidance";
+import { captureHintKey, captureUiFor, evaluateGuidance, isAngleStable, promptForDisplay } from "../lib/guidance";
 import {
   earInFrame,
   earRoiLayout,
@@ -181,12 +181,7 @@ export function EarCaptureApp() {
 
   const personalBest = bests[side];
   const captureUi = captureUiFor(personalBest !== null, live.allowCapture);
-  const captureHint =
-    captureUi === "ready"
-      ? t("READY")
-      : captureUi === "hold"
-        ? t("HOLD_STILL")
-        : t("learningNote");
+  const captureHint = t(captureHintKey(captureUi));
   const promptText =
     live.captured && !live.stuck
       ? captureFeedback?.grade === "offPeak"

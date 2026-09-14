@@ -82,6 +82,7 @@ describe("string lookup", () => {
   });
 
   it("NEAR_PEAK does not tell the user to hold still", () => {
+    expect(translate("zh", "NEAR_PEAK")).toContain("快到了");
     expect(translate("zh", "NEAR_PEAK")).not.toMatch(/保持不动|很好，保持/);
     expect(translate("en", "NEAR_PEAK")).not.toMatch(/hold still/i);
     expect(translate("zh", "SWEEP_RIGHT_EAR")).toContain("慢慢向左转");
