@@ -29,6 +29,10 @@ export type GuidanceInput = {
 
 export type GuidanceExtras = {
   yawDelta?: number;
+  /** False when the ear ROI is mostly clipped. Undefined = unknown (simulator). */
+  earInFrame?: boolean;
+  /** Weak/flat peak: capture allowed, copy distinct from READY. */
+  softPeak?: boolean;
 };
 
 export type GuidanceResult = {
@@ -161,6 +165,21 @@ export function pickPrompt(
     extras.yawDelta ?? 0,
     config,
   );
+  if (yawHint === "WRONG_SIDE") {
+    return { ...fail, prompt: yawHint, poseNear: false, poseReady: false };
+  }
+
+  const expectEar =
+    Math.abs(input.yaw) >= config.search.yawAbsMin || closeOnYaw;
+  if (extras.earInFrame === false && expectEar) {
+    return {
+      ...fail,
+      prompt: "EAR_OUT_OF_FRAME",
+      poseNear: false,
+      poseReady: false,
+    };
+  }
+
   if (yawHint) {
     return { ...fail, prompt: yawHint, poseNear: false, poseReady: false };
   }
@@ -187,7 +206,11 @@ export function pickPrompt(
   const allowCapture =
     poseReady && stable && qualityKind === "ok" && nearPeakScore;
   if (allowCapture) {
-    return { ...fail, prompt: "READY", allowCapture: true };
+    return {
+      ...fail,
+      prompt: extras.softPeak ? "SOFT_READY" : "READY",
+      allowCapture: true,
+    };
   }
   // Near a locked peak but not stable / not quite the peak score.
   // Never claim "hold still" while capture is still blocked.
@@ -199,7 +222,10 @@ export function promptForDisplay(
   prompt: PromptKey,
   allowCapture: boolean,
 ): PromptKey {
-  if (!allowCapture && (prompt === "READY" || prompt === "HOLD_STILL")) {
+  if (
+    !allowCapture &&
+    (prompt === "READY" || prompt === "HOLD_STILL" || prompt === "SOFT_READY")
+  ) {
     return "NEAR_PEAK";
   }
   return prompt;

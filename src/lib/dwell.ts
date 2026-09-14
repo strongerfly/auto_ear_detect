@@ -18,7 +18,15 @@ export type DwellUx = {
   readyPromoteMs?: number;
 };
 
-type Family = "face" | "dist" | "pose" | "yaw" | "quality" | "hold" | "ready";
+type Family =
+  | "face"
+  | "dist"
+  | "pose"
+  | "yaw"
+  | "quality"
+  | "hold"
+  | "ready"
+  | "stuck";
 
 function familyOf(prompt: PromptKey): Family {
   switch (prompt) {
@@ -27,11 +35,14 @@ function familyOf(prompt: PromptKey): Family {
       return "face";
     case "TOO_FAR":
     case "TOO_CLOSE":
+    case "EAR_OUT_OF_FRAME":
       return "dist";
     case "FIX_ROLL":
     case "PITCH_DOWN":
     case "PITCH_UP":
       return "pose";
+    case "INTRO_LEFT":
+    case "INTRO_RIGHT":
     case "SWEEP_RIGHT_EAR":
     case "SWEEP_LEFT_EAR":
     case "TURN_MORE":
@@ -49,7 +60,10 @@ function familyOf(prompt: PromptKey): Family {
     case "NEAR_PEAK":
       return "hold";
     case "READY":
+    case "SOFT_READY":
       return "ready";
+    case "STUCK_NO_PROGRESS":
+      return "stuck";
   }
 }
 
@@ -59,7 +73,9 @@ export function dwellMsFor(
   ux: DwellUx,
 ): number {
   if (from === null) return 0;
-  if (to === "READY") return ux.readyPromoteMs ?? 200;
+  if (to === "READY" || to === "SOFT_READY" || to === "STUCK_NO_PROGRESS") {
+    return ux.readyPromoteMs ?? 200;
+  }
   if (familyOf(from) === familyOf(to)) return ux.minDwellMs;
   return ux.crossFamilyDwellMs ?? ux.minDwellMs;
 }

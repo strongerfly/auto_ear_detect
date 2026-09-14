@@ -151,6 +151,48 @@ describe("string lookup", () => {
     expect(en.toLowerCase()).not.toContain("calibrate this side");
   });
 
+  it("side intro names body left/right with no absolute degrees", () => {
+    expect(translate("zh", "INTRO_RIGHT")).toMatch(/身体/);
+    expect(translate("zh", "INTRO_RIGHT")).toMatch(/右耳/);
+    expect(translate("zh", "INTRO_LEFT")).toMatch(/左耳/);
+    expect(translate("en", "INTRO_RIGHT")).toMatch(/body/i);
+    expect(translate("en", "INTRO_LEFT")).toMatch(/left ear/i);
+    expect(looksLikeRigidAngleChecklist(translate("zh", "INTRO_RIGHT"))).toBe(
+      false,
+    );
+    expect(looksLikeRigidAngleChecklist(translate("en", "INTRO_LEFT"))).toBe(
+      false,
+    );
+  });
+
+  it("stuck copy offers retry, relearn, and hair/light — not a dead shutter", () => {
+    expect(translate("zh", "STUCK_NO_PROGRESS")).toMatch(/头发|亮/);
+    expect(translate("zh", "STUCK_NO_PROGRESS")).toMatch(/重新学习/);
+    expect(translate("zh", "stuckRetry")).toBe("再试一次");
+    expect(translate("en", "STUCK_NO_PROGRESS")).toMatch(/hair|light/i);
+    expect(translate("en", "STUCK_NO_PROGRESS")).toMatch(/relearn/i);
+    expect(translate("en", "stuckRetry")).toMatch(/try again/i);
+  });
+
+  it("post-capture copy is relative to the peak, with retake / other ear", () => {
+    expect(translate("zh", "captureNearPeak")).toMatch(/最清楚/);
+    expect(translate("zh", "captureOffPeak")).toMatch(/重拍/);
+    expect(translate("zh", "retake")).toBe("重拍");
+    expect(translate("zh", "shootOtherEar")).toMatch(/另一/);
+    expect(translate("en", "captureNearPeak")).toMatch(/clearest/i);
+    expect(translate("en", "retake")).toMatch(/retake/i);
+    expect(translate("en", "shootOtherEar")).toMatch(/other ear/i);
+    expect(translate("zh", "captureNearPeak")).not.toMatch(/\d+\s*°/);
+    expect(translate("en", "captureNearPeak")).not.toMatch(/\d+\s*°/);
+  });
+
+  it("SOFT_READY is distinct from READY", () => {
+    expect(translate("zh", "SOFT_READY")).not.toBe(translate("zh", "READY"));
+    expect(translate("en", "SOFT_READY")).not.toBe(translate("en", "READY"));
+    expect(translate("zh", "EAR_OUT_OF_FRAME")).toMatch(/出画|画面/);
+    expect(translate("en", "EAR_OUT_OF_FRAME")).toMatch(/out of frame/i);
+  });
+
   it("README.zh-CN teaches auto-learn, not 60–95 offset calibration", () => {
     const md = readFileSync(
       resolve(import.meta.dirname, "../../README.zh-CN.md"),

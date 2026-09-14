@@ -165,6 +165,15 @@ h1 {
   box-shadow: 0 0 0 2px var(--accent-dim);
 }
 
+.stage.soft {
+  border-color: var(--warn);
+  box-shadow: 0 0 0 2px rgba(243, 193, 111, 0.28);
+}
+
+.stage.stuck {
+  border-color: var(--danger);
+}
+
 .cam,
 .overlay {
   position: absolute;
@@ -202,6 +211,17 @@ h1 {
 .prompt[data-ready="true"] {
   color: #06241c;
   background: var(--accent);
+}
+
+.prompt[data-soft="true"] {
+  color: #2a1d08;
+  background: var(--warn);
+}
+
+.prompt[data-captured="true"] {
+  color: var(--ink);
+  background: rgba(62, 224, 184, 0.22);
+  border: 1px solid var(--accent);
 }
 
 .stage-tag {
@@ -243,6 +263,34 @@ h1 {
   font-weight: 700;
   background: var(--danger);
   color: #2a0c08;
+}
+
+.stuck-banner {
+  position: absolute;
+  top: 44px;
+  left: 16px;
+  right: 16px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(8, 16, 14, 0.88);
+  border: 1px solid var(--danger);
+  pointer-events: auto;
+}
+
+.stuck-retry {
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-weight: 700;
+  background: var(--accent);
+  color: #06241c;
 }
 
 .ghost.warn {
@@ -313,6 +361,12 @@ h1 {
   color: #06241c;
 }
 
+.capture.soft:not(:disabled) {
+  background: var(--warn);
+  color: #2a1d08;
+  border-color: var(--warn);
+}
+
 .check {
   display: flex;
   gap: 6px;
@@ -344,6 +398,21 @@ h1 {
   margin: 0 0 8px;
   color: var(--muted);
   font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.preview figcaption strong {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 10px;
 }
 
 .sim {

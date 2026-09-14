@@ -17,7 +17,7 @@ Head pose from MediaPipe is for **direction**. Ear-ROI sharpness/structure is ho
 | Pose source | No dedicated 3D ear; tracker drops at high yaw | FISWG yaw/pitch/roll; search \|yaw\| **35–90°** | ~90° tracking is shaky; peak may sit on the inner edge | Ear detector/seg; freeze last-good on loss | Profile-labeled set; on-device latency budget |
 | Search band | Cannot guarantee a meatus axis | Configurable 35–90, soft preferred 40–80; **45° is allowed** | True peaks outside the window are missed | Widen with device FOV; stop search on track loss | Laptop/phone FOV calibration |
 | Score without ear seg | Hair, background texture, motion blur → false peaks | 0.45 Laplacian + 0.35 edges + 0.20 side-face prior; outside preferred only **−0.1** | Dark blob / hair can beat a real pinna | Learned quality head; light segmentation | Ear ROIs labeled by angle |
-| READY | Must not ask “is the ear frontal?” as the primary gate | Near bestYaw **±5°** + score ≥ **92%** of peak + 12 stable frames; no confirm | Flat score curves can soft-succeed | Burst of 3 frames, pick by score (shipped) | Per-device blur calibration |
+| READY | Must not ask “is the ear frontal?” as the primary gate | Near bestYaw **±5°** + score ≥ **92%** of peak + 12 stable frames; no confirm. Weak/flat peaks use **SOFT_READY** (capture still allowed) | Flat score curves can still lock; timeout recovery if score/peak does not improve | Burst of 3 frames, pick by score (countdown waits 3 ready frames; does not store a buffer) | Per-device blur calibration |
 | Personal peak | Stale peaks (haircut, glasses) | Auto-learn while turning; “relearn” clears | Did **not** hard-narrow ±10° next time (that would miss 45°) | alwaysRescore in-session; optional weak narrow | Same person, same device |
 | Laplacian | Tied to camera, compression, exposure | Raw min 80 / good 120; drifts across laptops | Absolute sharpness is not portable | One-shot blur calibration | Flat/hand calibration target |
 | Product goal | Meatus imaging ≠ pinna frontal | Optimize **pinna** clearest stable frame | Not an otoscope | Separate ROI/model if meatus is in scope | Clinical definition + consent |
@@ -29,8 +29,11 @@ Head pose from MediaPipe is for **direction**. Ear-ROI sharpness/structure is ho
 - **Ask “are you a 45° person?”:** will not. Peak is learned during a normal turn.
 - **Dedicated ear landmarks / 3D ear:** not wired. Face-mesh ear points are unreliable in profile, so we use head pose + ROI quality. Trigger: a stable profile ear-seg model within the latency budget.
 - **Require 60% window coverage before READY:** `minSweepCoverageRatio` is in config and **intentionally not a hard gate**, so a clear ear that peaks at ~45° can still READY. Documented as false-peak risk.
-- **45s timeout fail copy:** `failure.timeoutMs` exists; we do not nag it as the main path.
+- **45s no-progress timeout:** now a recovery narrative (`STUCK_NO_PROGRESS`) with **Try again** / **Relearn** / hair-light copy. Still not a hard fail, and it cannot diagnose *why* (hair vs light vs tracker vs false peak).
 - **Meatus-like dark-blob penalty:** weak center-brightness heuristic only. Without seg we cannot tell meatus from hair shadow.
+- **Ear-out-of-frame:** ROI clip ratio, not a real ear detector. Hair covering a fully in-frame pinna still looks like `CLEAR_HAIR`.
+- **Soft-success vs READY:** heuristic (weak absolute peak or a wide flat sweep). Not a calibrated “this is definitely not an ear” check.
+- **Burst pick-by-score of stored frames:** countdown still waits for 3 ready frames, then captures the current frame. It does not keep a 3-frame buffer and pick the sharpest.
 
 ## Won't do
 
@@ -47,4 +50,12 @@ Head pose from MediaPipe is for **direction**. Ear-ROI sharpness/structure is ho
 5. Ear score ≥ **92%** of the side’s peak; brightness 60–200  
 6. No yaw ∈ [70, 90] requirement; no user confirm  
 
-Guidance is one short line (中文 / English in the app). While the peak is still unknown we only ask the user to turn slowly (no “a little more / ease back” vs a prior angle). Near a locked peak but not yet stable we do **not** say “hold still” while capture is still blocked. READY promotes faster so prompts do not feel like a checklist. Absolute yaw/pitch/roll numbers stay behind a debug toggle.
+Guidance is one short line (中文 / English in the app). Switching left/right resets shutter, dwell, and guidance and shows a body-side intro; the other side’s stored peak is kept. While the peak is still unknown we only ask the user to turn slowly (no “a little more / ease back” vs a prior angle). Near a locked peak but not yet stable we do **not** say “hold still” while capture is still blocked. READY promotes faster so prompts do not feel like a checklist. After a shot, feedback is relative to the remembered peak (no absolute degrees), with retake / other ear. Absolute yaw/pitch/roll numbers stay behind a debug toggle.
+
+## Leftover cannot-do (this pass)
+
+- Timeout cannot tell hair vs light vs tracker drop vs a false peak — it only notices no score/peak improvement.
+- Ear-out-of-frame is a clipped-ROI heuristic, not ear segmentation.
+- Soft-success is a score-span / weak-peak heuristic, not a clinical “this isn’t an ear” gate.
+- Auto-shutter still does not keep a 3-frame still buffer and pick the sharpest.
+- No dedicated ear detector; a hair/background false peak can still lock (Relearn is the recovery).
