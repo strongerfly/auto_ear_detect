@@ -11,6 +11,7 @@ export function InstructionsPanel() {
       <h3>{t("helpStuckHeading")}</h3>
       <p>{t("helpStuckBody")}</p>
       <h3>{t("helpLimitsHeading")}</h3>
+      <p>{t("LIMITS_HINT")}</p>
       <p>{t("helpLimitsBody")}</p>
     </details>
   );

@@ -41,6 +41,12 @@ Head pose from MediaPipe is for **direction**. Ear-ROI sharpness/structure is ho
 - Primary path that waits for the user to confirm “the ear is frontal”
 - Dedicated ear landmarks / 3D ear without the trigger conditions in the table
 
+## Interaction: ceiling vs cannot-do (copy)
+
+User-facing strings live in `src/i18n/`. Unlocked prompts do not steer `TURN_MORE` / `TURN_BACK` against the prior. Grey shutter while learning is not “hold still.” Autoshutter countdown is cancelable. Relearn confirms and clears this side only. Absolute yaw/best numbers stay behind the debug toggle.
+
+**Cannot-do in copy.** Will not teach a universal 70–90 (or 60–95) READY band, or call relearn 校准.
+
 ## READY (as implemented)
 
 1. Face in frame, distance OK  

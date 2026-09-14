@@ -15,6 +15,25 @@ import {
   translate,
   userFacingKeys,
 } from "./messages";
+import type { Locale } from "./locale";
+
+function helpBundle(locale: Locale): string {
+  return [
+    translate(locale, "helpIntro"),
+    translate(locale, "helpTurnBody"),
+    translate(locale, "helpStuckBody"),
+    translate(locale, "helpLimitsBody"),
+    translate(locale, "LIMITS_HINT"),
+    translate(locale, "RELEARN"),
+    translate(locale, "INTRO_RIGHT"),
+    translate(locale, "INTRO_LEFT"),
+    translate(locale, "TURN_BACK_OVERSHOOT"),
+    translate(locale, "CLEAR_HAIR"),
+    translate(locale, "WRONG_SIDE"),
+    translate(locale, "SLOW_DOWN"),
+    translate(locale, "learningNote"),
+  ].join("\n");
+}
 
 afterEach(() => {
   localStorage.removeItem(LOCALE_STORAGE_KEY);
@@ -71,11 +90,20 @@ describe("string lookup", () => {
     expect(translate("en", "shootLeftEar")).toBe("Left ear");
     expect(translate("zh", "helpTitle")).toBe("使用说明");
     expect(translate("en", "helpTitle")).toBe("Instructions");
-    expect(translate("zh", "TURN_BACK_OVERSHOOT")).toBe(
-      "往回一点，刚才那边更清楚",
+    expect(translate("zh", "relearn")).toBe("重新学习此侧");
+    expect(translate("en", "relearn")).toBe("Relearn this side");
+    expect(translate("zh", "RELEARN")).toBe("重新学习此侧");
+    expect(translate("en", "RELEARN")).toBe("Relearn this side");
+    expect(translate("zh", "CAPTURED")).toBe("拍好了");
+    expect(translate("en", "CAPTURED")).toBe("Captured");
+    expect(translate("zh", "LIMITS_HINT")).toContain("重新学习此侧");
+    expect(translate("en", "LIMITS_HINT").toLowerCase()).toContain(
+      "relearn this side",
     );
+    expect(translate("zh", "TURN_BACK_OVERSHOOT")).toContain("刚才那边更清楚");
+    expect(translate("zh", "TURN_BACK_OVERSHOOT")).toContain("到头了，往回一点");
     expect(translate("en", "TURN_BACK_OVERSHOOT")).toContain(
-      "it was clearer just now",
+      "it looked clearer just before",
     );
     expect(translate("zh", "learningNote")).toContain("先慢转过头");
     expect(translate("en", "learningNote").toLowerCase()).toContain("sweep slowly");
@@ -158,6 +186,57 @@ describe("string lookup", () => {
     expect(en.toLowerCase()).not.toContain("calibrate this side");
   });
 
+  it("in-app help covers the walkthrough gaps in zh and en", () => {
+    const zh = helpBundle("zh");
+    expect(zh).toContain("往回一点");
+    expect(zh).toContain("刚才更清楚");
+    expect(zh).toContain("后脑勺");
+    expect(zh).toContain("到头了，往回一点");
+    expect(zh).toContain("方向反了");
+    expect(zh).toContain("系统不会自己换");
+    expect(zh).toContain("不要对着镜子反着学");
+    expect(zh).toContain("重新学习此侧");
+    expect(zh).toContain("只清这一侧");
+    expect(zh).toContain("误点");
+    expect(zh).toContain("拍摄按钮是灰的");
+    expect(zh).toContain("快到了");
+    expect(zh).toContain("自动快门");
+    expect(zh).toContain("浏览器设置");
+    expect(zh).toContain("不是电脑或手机");
+    expect(zh).toContain("转慢一点");
+    expect(zh).toContain("拨开头发");
+    expect(zh).toContain("糊了或反光");
+    expect(zh).toContain("保存的照片不是");
+    expect(zh).toContain("接着拍另一侧");
+    expect(zh).toContain("页头");
+    expect(zh).not.toContain("FISWG");
+
+    const en = helpBundle("en").toLowerCase();
+    expect(en).toContain("overshoot is normal");
+    expect(en).toContain("clearer pose");
+    expect(en).toContain("back of your head");
+    expect(en).toContain("as far as it goes");
+    expect(en).toContain("other way");
+    expect(en).toContain("switch for you");
+    expect(en).toContain("copy the mirror");
+    expect(en).toContain("relearn this side");
+    expect(en).toContain("this side only");
+    expect(en).toContain("accidental tap");
+    expect(en).toContain("capture stays off");
+    expect(en).toContain("stays grey");
+    expect(en).toContain("almost there");
+    expect(en).toContain("auto-shutter is on by default");
+    expect(en).toContain("browser settings");
+    expect(en).toContain("not the laptop or phone");
+    expect(en).toContain("slow down");
+    expect(en).toContain("tuck hair");
+    expect(en).toContain("blur");
+    expect(en).toContain("saved photo is not");
+    expect(en).toContain("tap the other side and turn again");
+    expect(en).toContain("header");
+    expect(en).not.toContain("fiswg");
+  });
+
   it("side intro names body left/right with no absolute degrees", () => {
     expect(translate("zh", "INTRO_RIGHT")).toMatch(/身体/);
     expect(translate("zh", "INTRO_RIGHT")).toMatch(/右耳/);
@@ -207,8 +286,15 @@ describe("string lookup", () => {
     );
     expect(md).not.toMatch(/60\s*[–-]\s*95/);
     expect(md).not.toContain("校准此侧偏移");
+    expect(md).not.toMatch(/校准/);
     expect(md).toContain("重新学习此侧");
     expect(md).toContain("自动学");
+    const howTo = md.split("## 运行")[0];
+    expect(howTo).toContain("到头了，往回一点");
+    expect(howTo).toContain("接着拍另一侧");
+    expect(howTo).toContain("拍摄按钮是灰的");
+    expect(howTo).toContain("方向反了");
+    expect(howTo).toContain("身体的左右");
   });
 
   it("interpolates placeholders", () => {
