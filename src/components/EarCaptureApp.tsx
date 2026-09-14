@@ -430,7 +430,6 @@ export function EarCaptureApp() {
       </header>
 
       <p className="status">{status}</p>
-      <InstructionsPanel />
 
       <section className={`stage ${live.allowCapture ? "ready" : ""}`}>
         <video
@@ -524,6 +523,8 @@ export function EarCaptureApp() {
           <img src={lastCapture} alt={t("lastCaptureAlt")} />
         </figure>
       ) : null}
+
+      <InstructionsPanel />
 
       <SimulatorPanel sim={sim} onChange={setSim} />
 
