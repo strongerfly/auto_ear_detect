@@ -1,18 +1,16 @@
-import type { PromptKey } from "../config";
+import type { PeakSample } from "../lib/personal-best";
 import { useLocale } from "../i18n";
 
 export function AngleHud({
   yaw,
   pitch,
   roll,
-  offset,
-  prompt,
+  bestYaw,
 }: {
   yaw: number | null;
   pitch: number | null;
   roll: number | null;
-  offset: number;
-  prompt: PromptKey | null;
+  bestYaw: PeakSample | null;
 }) {
   const { t } = useLocale();
   const fmt = (v: number | null) =>
@@ -29,13 +27,11 @@ export function AngleHud({
         roll <strong>{fmt(roll)}°</strong>
       </span>
       <span>
-        {t("hudOffset")}{" "}
+        {t("hudBest")}{" "}
         <strong>
-          {offset >= 0 ? "+" : ""}
-          {offset.toFixed(1)}°
+          {bestYaw ? `${bestYaw.yaw.toFixed(0)}°` : t("hudLearning")}
         </strong>
       </span>
-      {prompt ? <span className="hud-state">{t(prompt)}</span> : null}
     </div>
   );
 }

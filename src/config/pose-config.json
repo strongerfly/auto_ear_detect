@@ -1,5 +1,6 @@
 {
-  "version": 1,
+  "version": 2,
+  "captureMode": "qualityPeakYaw",
   "coordinateConvention": {
     "yawPositive": "rightEarVisible",
     "note": "FISWG: +yaw shows the right ear, -yaw the left. Calibrate matrix→Euler signs to match. User-visible copy lives in src/i18n, not here.",
@@ -16,47 +17,76 @@
     "minFaceHeightRatio": 0.25,
     "maxFaceHeightRatio": 0.70
   },
-  "poseTargets": {
-    "rightEar": {
-      "yawCenter": 80, "yawMin": 70, "yawMax": 90,
-      "pitchMin": -8, "pitchMax": 8, "rollMin": -8, "rollMax": 8
+  "search": {
+    "yawAbsMin": 35,
+    "yawAbsMax": 90,
+    "preferredAbsMin": 40,
+    "preferredAbsMax": 80,
+    "priorYawAbs": 60,
+    "pitchMin": -10,
+    "pitchMax": 10,
+    "rollMin": -8,
+    "rollMax": 8,
+    "minSweepCoverageRatio": 0.6,
+    "allowResweepOnce": true,
+    "tieBreak": "smallerAbsYaw",
+    "guidanceCoarseAbsError": 22,
+    "slowYawDeltaDeg": 18
+  },
+  "score": {
+    "weights": { "sharp": 0.45, "struct": 0.35, "content": 0.20 },
+    "sharp": { "laplacianMinRaw": 80, "laplacianGoodRaw": 120 },
+    "struct": { "minEdgeEnergy": 15, "goodEdgeEnergy": 40 },
+    "content": {
+      "requireSideFaceProxy": true,
+      "penalizeMeatusLikeDarkBlob": true,
+      "meatusPenalty": 0.25,
+      "meatusCenterBrightnessBelow": 40,
+      "outsidePreferredSoftPenalty": 0.1
     },
-    "leftEar": {
-      "yawCenter": -80, "yawMin": -90, "yawMax": -70,
-      "pitchMin": -8, "pitchMax": 8, "rollMin": -8, "rollMax": 8
-    }
+    "scoreMinAbsolute": 0.35,
+    "updateBestOnlyIfPoseOk": true,
+    "ignoreFrameIfFaceLost": true
+  },
+  "ready": {
+    "bandDegAroundBest": 5,
+    "scoreRatioOfBest": 0.92,
+    "stableFrames": 12,
+    "maxDeltaYawDeg": 3,
+    "maxDeltaPitchDeg": 3,
+    "maxDeltaRollDeg": 3,
+    "brightnessMin": 60,
+    "brightnessMax": 200,
+    "burstFrames": 3,
+    "pickBurstBy": "score",
+    "requireUserConfirm": false,
+    "pitchMaxAbs": 10,
+    "rollMaxAbs": 8
+  },
+  "personalBest": {
+    "persist": true,
+    "alwaysRescore": true,
+    "nextTimeNarrowSearchByDeg": 10,
+    "minScoreImprove": 0.02
   },
   "poseGuidance": {
     "rollCorrectAbove": 12,
+    "rollSevereAbove": 20,
     "pitchTooHighAbove": 12,
-    "pitchTooLowBelow": -12,
-    "rightEar": { "turnMoreBelow": 55, "almostBelow": 70, "tooFarAbove": 95 },
-    "leftEar": { "turnMoreAbove": -55, "almostAbove": -70, "tooFarBelow": -95 }
+    "pitchTooLowBelow": -12
   },
-  "captureBands": {
-    "nearMaxAbsYawError": 10,
-    "readyMaxAbsYawError": 5,
-    "readyMaxAbsPitchError": 8,
-    "readyMaxAbsRollError": 8
+  "promptUx": {
+    "minDwellMs": 400,
+    "crossFamilyDwellMs": 700,
+    "readyPromoteMs": 200,
+    "onlyOnePrompt": true
   },
-  "personalOffset": {
-    "enabled": true,
-    "clampDeg": 15,
-    "calibrationYawMinAbs": 60,
-    "calibrationYawMaxAbs": 95,
-    "defaultOffset": { "leftEar": 0, "rightEar": 0 }
-  },
-  "stability": {
-    "requiredStableFrames": 12,
-    "maxDeltaYawDeg": 3,
-    "maxDeltaPitchDeg": 3,
-    "maxDeltaRollDeg": 3
-  },
-  "earRoiQuality": {
-    "laplacianMin": 100,
-    "brightnessMin": 60,
-    "brightnessMax": 200,
-    "minEdgeEnergy": 15
-  },
-  "promptUx": { "minDwellMs": 400, "onlyOnePrompt": true }
+  "failure": {
+    "stuckNearInnerEdgeDeg": 38,
+    "stuckNearOuterEdgeDeg": 88,
+    "lowStructAcrossSweep": 12,
+    "flatPeakRangeDeg": 25,
+    "timeoutMs": 45000,
+    "maxFaceLostFrames": 15
+  }
 }

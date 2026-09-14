@@ -9,15 +9,19 @@ export type PromptKey =
   | "FIX_ROLL"
   | "PITCH_DOWN"
   | "PITCH_UP"
-  | "TURN_LEFT"
-  | "TURN_LEFT_MORE"
-  | "TURN_LEFT_BACK"
-  | "TURN_RIGHT"
-  | "TURN_RIGHT_MORE"
-  | "TURN_RIGHT_BACK"
+  | "SWEEP_RIGHT_EAR"
+  | "SWEEP_LEFT_EAR"
+  | "TURN_MORE"
+  | "TURN_BACK"
+  | "TURN_BACK_OVERSHOOT"
+  | "SLOW_DOWN"
+  | "WRONG_SIDE"
   | "CLEAR_HAIR"
   | "HOLD_STILL"
   | "BAD_LIGHT"
+  | "TOO_DARK"
+  | "TOO_BRIGHT"
+  | "MULTI_FACE"
   | "READY";
 
 export type PoseConfig = typeof poseConfigJson;
@@ -31,14 +35,18 @@ export const PROMPT_KEYS: PromptKey[] = [
   "FIX_ROLL",
   "PITCH_DOWN",
   "PITCH_UP",
-  "TURN_LEFT",
-  "TURN_LEFT_MORE",
-  "TURN_LEFT_BACK",
-  "TURN_RIGHT",
-  "TURN_RIGHT_MORE",
-  "TURN_RIGHT_BACK",
+  "SWEEP_RIGHT_EAR",
+  "SWEEP_LEFT_EAR",
+  "TURN_MORE",
+  "TURN_BACK",
+  "TURN_BACK_OVERSHOOT",
+  "SLOW_DOWN",
+  "WRONG_SIDE",
   "CLEAR_HAIR",
   "HOLD_STILL",
   "BAD_LIGHT",
+  "TOO_DARK",
+  "TOO_BRIGHT",
+  "MULTI_FACE",
   "READY",
 ];

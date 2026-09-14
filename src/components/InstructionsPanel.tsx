@@ -8,13 +8,10 @@ export function InstructionsPanel() {
       <p>{t("helpIntro")}</p>
       <h3>{t("helpTurnHeading")}</h3>
       <p>{t("helpTurnBody")}</p>
-      <h3>{t("helpSideHeading")}</h3>
-      <p>{t("helpSideBody")}</p>
-      <h3>{t("helpCalibrateHeading")}</h3>
-      <p>{t("helpCalibrateBody")}</p>
-      <h3>{t("helpReadyHeading")}</h3>
-      <p>{t("helpReadyBody")}</p>
-      <p>{t("helpMirror")}</p>
+      <h3>{t("helpStuckHeading")}</h3>
+      <p>{t("helpStuckBody")}</p>
+      <h3>{t("helpLimitsHeading")}</h3>
+      <p>{t("helpLimitsBody")}</p>
     </details>
   );
 }

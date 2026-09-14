@@ -9,6 +9,8 @@ export type SimState = {
   pitch: number;
   roll: number;
   quality: EarQuality;
+  qualityFollowsYaw: boolean;
+  qualityPeakYaw: number;
 };
 
 export const DEFAULT_SIM: SimState = {
@@ -19,6 +21,8 @@ export const DEFAULT_SIM: SimState = {
   pitch: 0,
   roll: 0,
   quality: { laplacian: 180, brightness: 120, edgeEnergy: 40 },
+  qualityFollowsYaw: false,
+  qualityPeakYaw: 45,
 };
 
 export function SimulatorPanel({
@@ -52,6 +56,15 @@ export function SimulatorPanel({
           disabled={!sim.enabled}
         />
         {t("simHasFace")}
+      </label>
+      <label className="sim-row">
+        <input
+          type="checkbox"
+          checked={sim.qualityFollowsYaw}
+          onChange={(e) => set({ qualityFollowsYaw: e.target.checked })}
+          disabled={!sim.enabled}
+        />
+        {t("simQualityFollowsYaw")}
       </label>
       <Slider
         label="yaw"
@@ -87,7 +100,17 @@ export function SimulatorPanel({
         onChange={(faceHeightRatio) => set({ faceHeightRatio })}
       />
       <Slider
-        label={t("simSharpness")}
+        label={t("simPeakYaw")}
+        min={-100}
+        max={100}
+        value={sim.qualityPeakYaw}
+        disabled={!sim.enabled || !sim.qualityFollowsYaw}
+        onChange={(qualityPeakYaw) => set({ qualityPeakYaw })}
+      />
+      <Slider
+        label={
+          sim.qualityFollowsYaw ? t("simPeakSharpness") : t("simSharpness")
+        }
         min={0}
         max={400}
         value={sim.quality.laplacian}

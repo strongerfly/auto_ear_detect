@@ -14,9 +14,7 @@ type UiMessageKey =
   | "capture"
   | "autoShutter"
   | "downloadLast"
-  | "calibrate"
-  | "finishCalibrate"
-  | "clearOffset"
+  | "relearn"
   | "lastCaptureCaption"
   | "lastCaptureAlt"
   | "footer"
@@ -25,17 +23,23 @@ type UiMessageKey =
   | "modelLoadFailed"
   | "simMode"
   | "cameraError"
+  | "cameraDenied"
   | "cameraOff"
   | "previewHint"
-  | "calibNote"
-  | "qualityNote"
-  | "hudOffset"
+  | "learningNote"
+  | "learnedNote"
+  | "captured"
+  | "hudBest"
+  | "hudLearning"
   | "simSummary"
   | "simEnable"
   | "simHasFace"
   | "simFaceHeight"
   | "simSharpness"
   | "simBrightness"
+  | "simQualityFollowsYaw"
+  | "simPeakYaw"
+  | "simPeakSharpness"
   | "roiRight"
   | "roiLeft"
   | "simStillRight"
@@ -44,13 +48,10 @@ type UiMessageKey =
   | "helpIntro"
   | "helpTurnHeading"
   | "helpTurnBody"
-  | "helpSideHeading"
-  | "helpSideBody"
-  | "helpCalibrateHeading"
-  | "helpCalibrateBody"
-  | "helpReadyHeading"
-  | "helpReadyBody"
-  | "helpMirror";
+  | "helpStuckHeading"
+  | "helpStuckBody"
+  | "helpLimitsHeading"
+  | "helpLimitsBody";
 
 export type MessageKey = PromptKey | UiMessageKey;
 
@@ -59,19 +60,23 @@ type Messages = Record<MessageKey, string>;
 const zh: Messages = {
   NO_FACE: "请把脸移入取景框",
   TOO_FAR: "请靠近一点",
-  TOO_CLOSE: "请稍远一点",
-  FIX_ROLL: "请摆正脑袋，不要歪头",
-  PITCH_DOWN: "请稍微低头",
-  PITCH_UP: "请稍微抬头",
-  TURN_LEFT: "请向左转头，露出右耳",
-  TURN_LEFT_MORE: "再向左转一点",
-  TURN_LEFT_BACK: "转得有点过了，往回一点",
-  TURN_RIGHT: "请向右转头，露出左耳",
-  TURN_RIGHT_MORE: "再向右转一点",
-  TURN_RIGHT_BACK: "转得有点过了，往回一点",
-  CLEAR_HAIR: "请把耳边头发拨开",
-  HOLD_STILL: "很好，请保持不动",
+  TOO_CLOSE: "请稍远一点，露出整只耳朵",
+  FIX_ROLL: "头摆正一点，不要歪",
+  PITCH_DOWN: "稍微低头",
+  PITCH_UP: "稍微抬头",
+  SWEEP_RIGHT_EAR: "拍右耳：慢慢向左转，找到耳朵最清楚的角度",
+  SWEEP_LEFT_EAR: "拍左耳：慢慢向右转，找到耳朵最清楚的角度",
+  TURN_MORE: "再转一点点",
+  TURN_BACK: "往回一点，朝更清楚的那边",
+  TURN_BACK_OVERSHOOT: "到头了，往回一点",
+  SLOW_DOWN: "转慢一点",
+  WRONG_SIDE: "方向反了，按提示转，不要跟着镜子反着来",
+  CLEAR_HAIR: "拨开耳边头发（糊了或反光也先试试）",
+  HOLD_STILL: "很好，保持不动",
   BAD_LIGHT: "光线不太好，换亮一点的地方",
+  TOO_DARK: "太暗了，换亮一点",
+  TOO_BRIGHT: "太亮了，避开强光",
+  MULTI_FACE: "画面里请只留一张脸",
   READY: "可以拍了",
 
   appTitle: "耳廓引导拍摄",
@@ -84,71 +89,74 @@ const zh: Messages = {
   capture: "拍摄",
   autoShutter: "自动快门",
   downloadLast: "下载上次拍摄",
-  calibrate: "校准此侧偏移",
-  finishCalibrate: "完成校准",
-  clearOffset: "清除此侧偏移",
-  lastCaptureCaption: "上次拍摄（未镜像，解剖左右）",
-  lastCaptureAlt: "上次拍摄的耳部照片",
-  footer:
-    "FISWG：+yaw 露右耳，−yaw 露左耳。Euler 顺序 YXZ。阈值见 src/config/pose-config.json，界面文案见 src/i18n。",
+  relearn: "重新学习此侧",
+  lastCaptureCaption: "刚拍好（保存的照片不是镜像，左右和真人一样）",
+  lastCaptureAlt: "刚拍好的耳部照片",
+  footer: "左右指身体的左右。预览像镜子，保存的照片不是。",
   loadingLandmarker: "正在加载 Face Landmarker…",
-  clickToStart:
-    "点击「打开摄像头」开始。前置预览已镜像，姿态按未翻转画面估计。",
+  clickToStart: "点「打开摄像头」开始。慢慢转，找到耳朵最清楚的角度。",
   modelLoadFailed: "模型加载失败：{error}。仍可用姿态模拟器。",
   simMode: "模拟模式",
   cameraError: "摄像头：{error}",
+  cameraDenied:
+    "摄像头被拒绝了。请在浏览器设置里允许这个网站使用摄像头。",
   cameraOff: "摄像头未开启",
-  previewHint: "前置预览（CSS 镜像）· 推理用未翻转帧",
-  calibNote: "请慢慢转头（|yaw| 60–95°），峰值清晰度 {peak}",
-  qualityNote:
-    "耳区 Laplacian {laplacian} · 亮度 {brightness} · 边缘 {edge}",
-  hudOffset: "偏移",
-  simSummary: "姿态模拟器（无摄像头时可验证引导）",
+  previewHint: "前置预览像镜子 · 保存的照片不是",
+  learningNote: "慢慢转，系统会自己记住这侧最清楚的角度",
+  learnedNote: "已记住此侧最清楚的角度",
+  captured: "拍好了",
+  hudBest: "最清楚",
+  hudLearning: "学习中",
+  simSummary: "姿态模拟器（没有摄像头也能试引导）",
   simEnable: "启用模拟",
   simHasFace: "画面中有脸",
   simFaceHeight: "脸高比",
   simSharpness: "清晰度",
   simBrightness: "亮度",
-  roiRight: "右耳 ROI",
-  roiLeft: "左耳 ROI",
+  simQualityFollowsYaw: "质量随角度变化（给开发者试引导）",
+  simPeakYaw: "质量峰值角度",
+  simPeakSharpness: "峰值清晰度",
+  roiRight: "右耳",
+  roiLeft: "左耳",
   simStillRight: "右耳 · 模拟拍摄",
   simStillLeft: "左耳 · 模拟拍摄",
 
   helpTitle: "使用说明",
   helpIntro:
-    "本应用通过头部姿态引导，拍摄一侧耳廓朝向镜头的照片。先选左右耳，按提示转头，等到「可以拍了」再拍。",
-  helpTurnHeading: "是转头，不是歪头",
+    "页头可切中文 / English。先点「拍左耳」或「拍右耳」（身体的左右，不是镜子里的左右）。用前置摄像头，按提示慢慢转头——转的是头，不是电脑或手机。转的时候系统会自己记住这侧最清楚的角度；第一次要慢慢转过，提示「可以拍了」才会开拍。默认开着自动快门，到点会自己拍。拍完一侧，再点另一侧重转。",
+  helpTurnHeading: "怎么转",
   helpTurnBody:
-    "向左或向右转头（yaw）才能让目标耳朵朝向摄像头。向肩膀歪头（roll）或抬头/低头（pitch）是另一种动作——请先摆正，再转头。",
-  helpSideHeading: "先选择左耳或右耳",
-  helpSideBody:
-    "拍摄前点「拍左耳」或「拍右耳」。+yaw 露出右耳，−yaw 露出左耳。引导文案说的是你身体的左/右，不是屏幕上的左/右。",
-  helpCalibrateHeading: "耳角度不同时可校准",
-  helpCalibrateBody:
-    "有些人最佳侧面角度略有偏差。使用「校准此侧偏移」，在 |yaw| 为 60–95° 时慢慢转头；耳区最清晰时的 yaw 会记为个人偏移（限制在 ±15°）。",
-  helpReadyHeading: "等到「可以拍了」",
-  helpReadyBody:
-    "只有姿态进入就绪区间、连续多帧稳定、且耳区清晰、光线合适时才会启用拍摄（以及可选自动快门）。请等到提示变为「可以拍了」。",
-  helpMirror:
-    "前置预览为镜像，方便对照；保存的照片未镜像，解剖左右与 FISWG 一致。",
+    "拍右耳：向左转。拍左耳：向右转。跟着提示走，不要对着镜子反着学。转过头很正常——「往回一点」是朝刚才更清楚的那边转回去，别继续转到后脑勺。转到头了会说「到头了，往回一点」。转太快会请你转慢一点。框在另一只耳朵上时，点另一侧按钮，系统不会自己改。",
+  helpStuckHeading: "拍不了的时候",
+  helpStuckBody:
+    "摄像头被拒：到浏览器设置里允许这个网站使用摄像头。头发挡住、糊了或反光：拨开头发、换亮一点。角度记错、换了眼镜或发型、一直出不了「可以拍了」：点「重新学习此侧」（只清这一侧），再慢慢转一次。误点的话，拍不了，直到重新学会。",
+  helpLimitsHeading: "能做什么、不能做什么",
+  helpLimitsBody:
+    "能拍一只耳朵朝向镜头的清晰照，不是医院耳镜，也不会检查你是不是点错了耳朵。头大致摆正、脸在框里、距离合适。太暗、太亮或头发挡住会失败。只有侧着转头时才会学习（几乎正面或转到后脑勺都不算）。预览像镜子，保存的照片不是，左右不会反。",
 };
 
 const en: Messages = {
   NO_FACE: "Move your face into the frame",
   TOO_FAR: "Move a little closer",
-  TOO_CLOSE: "Move a little farther away",
+  TOO_CLOSE: "Move a little farther so the whole ear is in view",
   FIX_ROLL: "Straighten your head — don't tilt",
-  PITCH_DOWN: "Tuck your chin slightly",
-  PITCH_UP: "Lift your chin slightly",
-  TURN_LEFT: "Turn your head left to show the right ear",
-  TURN_LEFT_MORE: "Turn a bit more to the left",
-  TURN_LEFT_BACK: "A bit too far — ease back",
-  TURN_RIGHT: "Turn your head right to show the left ear",
-  TURN_RIGHT_MORE: "Turn a bit more to the right",
-  TURN_RIGHT_BACK: "A bit too far — ease back",
-  CLEAR_HAIR: "Tuck hair away from the ear",
+  PITCH_DOWN: "Tuck your chin a little",
+  PITCH_UP: "Lift your chin a little",
+  SWEEP_RIGHT_EAR:
+    "Right ear: turn slowly left until the ear looks clearest",
+  SWEEP_LEFT_EAR:
+    "Left ear: turn slowly right until the ear looks clearest",
+  TURN_MORE: "A little more",
+  TURN_BACK: "Ease back toward the clearer pose",
+  TURN_BACK_OVERSHOOT: "That's as far as it goes — ease back",
+  SLOW_DOWN: "Turn a bit slower",
+  WRONG_SIDE: "Other way — follow the prompt, not the mirror",
+  CLEAR_HAIR: "Tuck hair away from the ear (also try this if it's blurry or shiny)",
   HOLD_STILL: "Good — hold still",
-  BAD_LIGHT: "Lighting is poor — move to a brighter spot",
+  BAD_LIGHT: "Lighting is poor — move somewhere brighter",
+  TOO_DARK: "Too dark — find a brighter spot",
+  TOO_BRIGHT: "Too bright — ease off the glare",
+  MULTI_FACE: "Keep just one face in the frame",
   READY: "Ready to capture",
 
   appTitle: "Head-pose ear capture",
@@ -161,53 +169,54 @@ const en: Messages = {
   capture: "Capture",
   autoShutter: "Auto-shutter",
   downloadLast: "Download last capture",
-  calibrate: "Calibrate this side",
-  finishCalibrate: "Finish calibration",
-  clearOffset: "Clear this side's offset",
-  lastCaptureCaption: "Last capture (unmirrored, anatomical L/R)",
-  lastCaptureAlt: "Last captured ear photo",
+  relearn: "Relearn this side",
+  lastCaptureCaption:
+    "Just captured (saved photo is not mirrored — left/right match real life)",
+  lastCaptureAlt: "Just captured ear photo",
   footer:
-    "FISWG: +yaw shows the right ear, −yaw the left. Euler order YXZ. Thresholds in src/config/pose-config.json; UI copy in src/i18n.",
+    "Left/right means your body, not the screen. Preview is a mirror; saved photos are not.",
   loadingLandmarker: "Loading Face Landmarker…",
   clickToStart:
-    "Click “Open camera” to begin. The front preview is mirrored; pose is estimated from the unflipped frame.",
-  modelLoadFailed: "Model failed to load: {error}. You can still use the pose simulator.",
+    "Click “Open camera” to begin. Turn slowly until the ear looks clearest.",
+  modelLoadFailed:
+    "Model failed to load: {error}. You can still use the pose simulator.",
   simMode: "Simulator mode",
   cameraError: "Camera: {error}",
+  cameraDenied:
+    "Camera access was denied. Allow this site in your browser settings.",
   cameraOff: "Camera is off",
-  previewHint: "Front preview (CSS-mirrored) · inference uses the unflipped frame",
-  calibNote: "Turn slowly (|yaw| 60–95°). Peak sharpness {peak}",
-  qualityNote:
-    "Ear ROI Laplacian {laplacian} · brightness {brightness} · edges {edge}",
-  hudOffset: "Offset",
-  simSummary: "Pose simulator (exercise guidance without a webcam)",
+  previewHint: "Front preview is a mirror · saved photos are not",
+  learningNote: "Turn slowly — the app remembers the clearest angle for this side",
+  learnedNote: "Remembered the clearest angle for this side",
+  captured: "Captured",
+  hudBest: "Clearest",
+  hudLearning: "Learning",
+  simSummary: "Pose simulator (try guidance without a webcam)",
   simEnable: "Enable simulator",
   simHasFace: "Face in frame",
   simFaceHeight: "Face height ratio",
   simSharpness: "Sharpness",
   simBrightness: "Brightness",
-  roiRight: "Right ear ROI",
-  roiLeft: "Left ear ROI",
+  simQualityFollowsYaw: "Quality follows angle (for trying guidance)",
+  simPeakYaw: "Peak-quality angle",
+  simPeakSharpness: "Peak sharpness",
+  roiRight: "Right ear",
+  roiLeft: "Left ear",
   simStillRight: "Right ear · simulated capture",
   simStillLeft: "Left ear · simulated capture",
 
   helpTitle: "Instructions",
   helpIntro:
-    "This app captures a photo of one ear facing the camera by guiding your head pose. Choose left or right ear, follow the prompts, and wait for “Ready to capture”.",
-  helpTurnHeading: "Turn, don’t tilt",
+    "Switch 中文 / English in the header. Tap Left ear or Right ear first (your body, not the mirror). Use the front camera and turn your head as prompted — the head, not the laptop or phone. While you turn slowly, the app remembers the clearest angle for that side. The first time, capture stays off until you’ve swept slowly. Auto-shutter is on by default and will shoot when it says Ready. After one ear, tap the other side and turn again.",
+  helpTurnHeading: "How to turn",
   helpTurnBody:
-    "Rotate your head left or right (yaw) so the chosen ear faces the camera. Tilting toward a shoulder (roll) or looking up/down (pitch) is a different motion — straighten those first, then turn.",
-  helpSideHeading: "Choose left or right ear",
-  helpSideBody:
-    "Tap “Left ear” or “Right ear” before you start. +yaw shows the right ear; −yaw shows the left. Guidance refers to your physical left/right, not screen-left.",
-  helpCalibrateHeading: "Calibrate if your ear angle differs",
-  helpCalibrateBody:
-    "Some ears look best at a slightly different profile angle. Use “Calibrate this side” and slowly turn while |yaw| is 60–95°. The yaw at peak ear sharpness becomes a personal offset (clamped ±15°).",
-  helpReadyHeading: "Wait for READY",
-  helpReadyBody:
-    "Capture is enabled (and optional auto-shutter fires) only when the pose is in the ready band, stable for several frames, and the ear region is sharp and well-lit. Wait until the prompt says “Ready to capture”.",
-  helpMirror:
-    "The front-camera preview is mirrored for comfort; saved photos are not, so anatomical left/right matches FISWG.",
+    "Right ear: turn left. Left ear: turn right. Follow the prompt; don’t copy the mirror. Overshoot is normal — “ease back” means toward the clearer pose, not past the back of your head. At the far edge you’ll see “that’s as far as it goes.” If you turn too fast, slow down. If the box is on the other ear, tap the other side — it won’t switch for you.",
+  helpStuckHeading: "If it won’t capture",
+  helpStuckBody:
+    "Camera denied: allow this site in your browser settings. Hair, blur, or glare: tuck hair aside and find better light. Wrong lock, new glasses or haircut, or you never reach Ready: tap Relearn this side (clears this side only) and turn slowly again. An accidental tap blocks capture until that side is relearned.",
+  helpLimitsHeading: "What it can and can’t do",
+  helpLimitsBody:
+    "It can take a clear photo of one ear facing the camera. It is not a clinical ear scanner, and it won’t check that you picked the correct ear. Keep your head roughly upright, face in frame, at a comfortable distance. Dark, bright, or hair-blocked shots fail. It only learns while you turn to the side — not almost frontal, not past the back of the head. The preview is a mirror; the saved photo is not.",
 };
 
 const catalogs: Record<Locale, Messages> = { zh, en };
@@ -236,4 +245,24 @@ export function translate(
 
 export function messagesFor(locale: Locale): Messages {
   return catalogs[locale] ?? catalogs.en;
+}
+
+const RIGID_USER_COPY = /70\s*[–-]\s*90|60\s*[–-]\s*95|\|yaw\||±\s*15|FISWG/i;
+
+export function userFacingKeys(): MessageKey[] {
+  return [
+    ...Object.keys(zh).filter((key) => key.startsWith("help")) as MessageKey[],
+    "SWEEP_RIGHT_EAR",
+    "SWEEP_LEFT_EAR",
+    "TURN_MORE",
+    "TURN_BACK",
+    "TURN_BACK_OVERSHOOT",
+    "learningNote",
+    "relearn",
+    "clickToStart",
+  ];
+}
+
+export function looksLikeRigidAngleChecklist(text: string): boolean {
+  return RIGID_USER_COPY.test(text);
 }

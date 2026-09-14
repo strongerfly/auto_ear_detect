@@ -6,7 +6,12 @@ import {
   localeFromBrowserLanguage,
   saveLocale,
 } from "./locale";
-import { interpolate, translate } from "./messages";
+import {
+  interpolate,
+  looksLikeRigidAngleChecklist,
+  translate,
+  userFacingKeys,
+} from "./messages";
 
 afterEach(() => {
   localStorage.removeItem(LOCALE_STORAGE_KEY);
@@ -42,9 +47,9 @@ describe("string lookup", () => {
   it("returns Chinese and English guidance for the same prompt key", () => {
     expect(translate("zh", "READY")).toBe("可以拍了");
     expect(translate("en", "READY")).toBe("Ready to capture");
-    expect(translate("zh", "TURN_LEFT")).toBe("请向左转头，露出右耳");
-    expect(translate("en", "TURN_LEFT")).toBe(
-      "Turn your head left to show the right ear",
+    expect(translate("zh", "SWEEP_RIGHT_EAR")).toContain("慢慢向左转");
+    expect(translate("en", "SWEEP_RIGHT_EAR")).toContain(
+      "turn slowly left until the ear looks clearest",
     );
   });
 
@@ -63,6 +68,15 @@ describe("string lookup", () => {
     expect(translate("en", "shootLeftEar")).toBe("Left ear");
     expect(translate("zh", "helpTitle")).toBe("使用说明");
     expect(translate("en", "helpTitle")).toBe("Instructions");
+    expect(translate("zh", "relearn")).toBe("重新学习此侧");
+    expect(translate("en", "relearn")).toBe("Relearn this side");
+  });
+
+  it("keeps user-facing help and sweep copy free of rigid angle checklists", () => {
+    for (const key of userFacingKeys()) {
+      expect(looksLikeRigidAngleChecklist(translate("zh", key))).toBe(false);
+      expect(looksLikeRigidAngleChecklist(translate("en", key))).toBe(false);
+    }
   });
 
   it("interpolates placeholders", () => {

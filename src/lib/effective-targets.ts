@@ -1,8 +1,11 @@
 import type { EarSide, PoseConfig } from "../config";
+import type { PeakSample } from "./personal-best";
 
 export type EffectiveTargets = {
   side: EarSide;
-  offset: number;
+  locked: boolean;
+  bestYaw: number | null;
+  peakScore: number | null;
   yawCenter: number;
   yawMin: number;
   yawMax: number;
@@ -10,85 +13,38 @@ export type EffectiveTargets = {
   pitchMax: number;
   rollMin: number;
   rollMax: number;
-  turnMoreBelow?: number;
-  almostBelow?: number;
-  tooFarAbove?: number;
-  turnMoreAbove?: number;
-  almostAbove?: number;
-  tooFarBelow?: number;
+  coarseAbsError: number;
+  fineAbsError: number;
 };
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
 /**
- * Translate the yaw band by a personal offset, then clamp so the band stays
- * in a plausible profile range (does not cross the face or go past ~100°).
+ * Guidance center is the personal best yaw when one has been observed,
+ * otherwise the soft prior (search.priorYawAbs). Ready gating uses `locked`
+ * so the prior band alone cannot fire capture.
  */
 export function effectiveTargets(
   side: EarSide,
-  rawOffset: number,
+  best: PeakSample | null,
   config: PoseConfig,
 ): EffectiveTargets {
-  const t = config.poseTargets[side];
-  const clampDeg = config.personalOffset.clampDeg;
-  const offset = config.personalOffset.enabled
-    ? clamp(rawOffset, -clampDeg, clampDeg)
-    : 0;
-
-  if (side === "rightEar") {
-    const g = config.poseGuidance.rightEar;
-    const limMin = 50;
-    const limMax = 100;
-    let yawMin = clamp(t.yawMin + offset, limMin, limMax);
-    let yawMax = clamp(t.yawMax + offset, limMin, limMax);
-    if (yawMin > yawMax) {
-      const tmp = yawMin;
-      yawMin = yawMax;
-      yawMax = tmp;
-    }
-    const yawCenter = clamp(t.yawCenter + offset, yawMin, yawMax);
-    return {
-      side,
-      offset,
-      yawCenter,
-      yawMin,
-      yawMax,
-      pitchMin: t.pitchMin,
-      pitchMax: t.pitchMax,
-      rollMin: t.rollMin,
-      rollMax: t.rollMax,
-      turnMoreBelow: g.turnMoreBelow + offset,
-      almostBelow: g.almostBelow + offset,
-      tooFarAbove: g.tooFarAbove + offset,
-    };
-  }
-
-  const g = config.poseGuidance.leftEar;
-  const limMin = -100;
-  const limMax = -50;
-  let yawMin = clamp(t.yawMin + offset, limMin, limMax);
-  let yawMax = clamp(t.yawMax + offset, limMin, limMax);
-  if (yawMin > yawMax) {
-    const tmp = yawMin;
-    yawMin = yawMax;
-    yawMax = tmp;
-  }
-  const yawCenter = clamp(t.yawCenter + offset, yawMin, yawMax);
+  const prior =
+    side === "rightEar" ? config.search.priorYawAbs : -config.search.priorYawAbs;
+  const readyErr = config.ready.bandDegAroundBest;
+  const yawCenter = best ? best.yaw : prior;
   return {
     side,
-    offset,
+    locked: best !== null,
+    bestYaw: best?.yaw ?? null,
+    peakScore: best?.score ?? null,
     yawCenter,
-    yawMin,
-    yawMax,
-    pitchMin: t.pitchMin,
-    pitchMax: t.pitchMax,
-    rollMin: t.rollMin,
-    rollMax: t.rollMax,
-    turnMoreAbove: g.turnMoreAbove + offset,
-    almostAbove: g.almostAbove + offset,
-    tooFarBelow: g.tooFarBelow + offset,
+    yawMin: yawCenter - readyErr,
+    yawMax: yawCenter + readyErr,
+    pitchMin: -config.ready.pitchMaxAbs,
+    pitchMax: config.ready.pitchMaxAbs,
+    rollMin: -config.ready.rollMaxAbs,
+    rollMax: config.ready.rollMaxAbs,
+    coarseAbsError: config.search.guidanceCoarseAbsError,
+    fineAbsError: readyErr,
   };
 }
 
@@ -113,11 +69,12 @@ export function inReadyBand(
   pitch: number,
   roll: number,
   t: EffectiveTargets,
-  bands: PoseConfig["captureBands"],
+  config: PoseConfig,
 ): boolean {
+  if (!t.locked || t.bestYaw === null) return false;
   return (
-    Math.abs(yaw - t.yawCenter) <= bands.readyMaxAbsYawError &&
-    Math.abs(pitch) <= bands.readyMaxAbsPitchError &&
-    Math.abs(roll) <= bands.readyMaxAbsRollError
+    Math.abs(yaw - t.bestYaw) <= config.ready.bandDegAroundBest &&
+    Math.abs(pitch) <= config.ready.pitchMaxAbs &&
+    Math.abs(roll) <= config.ready.rollMaxAbs
   );
 }

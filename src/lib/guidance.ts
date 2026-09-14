@@ -1,5 +1,4 @@
-import type { PromptKey } from "../config";
-import type { PoseConfig } from "../config";
+import type { PromptKey, PoseConfig } from "../config";
 import type { EarQuality, EulerDeg } from "./types";
 import {
   classifyEarQuality,
@@ -11,6 +10,10 @@ import {
   inReadyBand,
   type EffectiveTargets,
 } from "./effective-targets";
+import {
+  qualityNearPeak,
+  type PeakSample,
+} from "./personal-best";
 
 export type GuidanceInput = {
   hasFace: boolean;
@@ -21,6 +24,11 @@ export type GuidanceInput = {
   pitch: number;
   roll: number;
   quality: EarQuality | null;
+  faceCount?: number;
+};
+
+export type GuidanceExtras = {
+  yawDelta?: number;
 };
 
 export type GuidanceResult = {
@@ -32,39 +40,72 @@ export type GuidanceResult = {
   allowCapture: boolean;
 };
 
-function pickYawPrompt(yaw: number, t: EffectiveTargets): PromptKey | null {
-  if (t.side === "rightEar") {
-    if (yaw < (t.turnMoreBelow ?? 55)) return "TURN_LEFT";
-    if (yaw < (t.almostBelow ?? 70)) return "TURN_LEFT_MORE";
-    if (yaw > (t.tooFarAbove ?? 95)) return "TURN_LEFT_BACK";
-    return null;
+/** Progressive yaw hints relative to personal best (or the soft prior). */
+function pickYawPrompt(
+  yaw: number,
+  t: EffectiveTargets,
+  yawDelta: number,
+  config: PoseConfig,
+): PromptKey | null {
+  if (t.side === "rightEar" && yaw < -8) return "WRONG_SIDE";
+  if (t.side === "leftEar" && yaw > 8) return "WRONG_SIDE";
+
+  if (Math.abs(yaw) >= config.failure.stuckNearOuterEdgeDeg) {
+    return "TURN_BACK_OVERSHOOT";
   }
-  if (yaw > (t.turnMoreAbove ?? -55)) return "TURN_RIGHT";
-  if (yaw > (t.almostAbove ?? -70)) return "TURN_RIGHT_MORE";
-  if (yaw < (t.tooFarBelow ?? -95)) return "TURN_RIGHT_BACK";
-  return null;
+
+  const err = yaw - t.yawCenter;
+  const abs = Math.abs(err);
+  if (abs <= t.fineAbsError) return null;
+
+  if (
+    yawDelta >= config.search.slowYawDeltaDeg &&
+    abs > t.fineAbsError
+  ) {
+    return "SLOW_DOWN";
+  }
+
+  if (t.side === "rightEar") {
+    if (err > t.fineAbsError) return "TURN_BACK";
+    if (err < -t.coarseAbsError) return "SWEEP_RIGHT_EAR";
+    return "TURN_MORE";
+  }
+  if (err < -t.fineAbsError) return "TURN_BACK";
+  if (err > t.coarseAbsError) return "SWEEP_LEFT_EAR";
+  return "TURN_MORE";
 }
 
 /**
- * Priority: NO_FACE → distance → roll → pitch → yaw turn hints →
- * hair/light/blur → HOLD_STILL → READY.
+ * Natural order: keep the user turning, then fix pose/hair only when close.
+ * READY = near bestYaw (±band) + score near peak + stable. Never requires 70–90.
  */
 export function pickPrompt(
   input: GuidanceInput,
   config: PoseConfig,
   targets: EffectiveTargets,
   stableFrames: number,
+  extras: GuidanceExtras = {},
 ): GuidanceResult {
-  const qualityKind = classifyEarQuality(input.quality, config.earRoiQuality);
+  const qualityKind = classifyEarQuality(input.quality, config);
   const poseNear = inNearBand(input.yaw, input.pitch, input.roll, targets);
   const poseReady = inReadyBand(
     input.yaw,
     input.pitch,
     input.roll,
     targets,
-    config.captureBands,
+    config,
   );
-  const stable = stableFrames >= config.stability.requiredStableFrames;
+  const stable = stableFrames >= config.ready.stableFrames;
+  const peak =
+    targets.locked && targets.bestYaw !== null && targets.peakScore !== null
+      ? { yaw: targets.bestYaw, score: targets.peakScore }
+      : null;
+  const nearPeakScore = qualityNearPeak(
+    input.quality,
+    peak,
+    input.yaw,
+    config,
+  );
 
   const fail: Omit<GuidanceResult, "prompt"> = {
     poseNear,
@@ -81,23 +122,40 @@ export function pickPrompt(
   ) {
     return { ...fail, prompt: "NO_FACE", poseNear: false, poseReady: false };
   }
+  if ((input.faceCount ?? 1) > 1) {
+    return { ...fail, prompt: "MULTI_FACE", poseNear: false, poseReady: false };
+  }
   if (input.faceHeightRatio < config.faceGates.minFaceHeightRatio) {
     return { ...fail, prompt: "TOO_FAR", poseNear: false, poseReady: false };
   }
   if (input.faceHeightRatio > config.faceGates.maxFaceHeightRatio) {
     return { ...fail, prompt: "TOO_CLOSE", poseNear: false, poseReady: false };
   }
-  if (Math.abs(input.roll) > config.poseGuidance.rollCorrectAbove) {
+
+  const absYawErr = Math.abs(input.yaw - targets.yawCenter);
+  const closeOnYaw = absYawErr <= targets.coarseAbsError;
+  const severeRoll =
+    Math.abs(input.roll) >= config.poseGuidance.rollSevereAbove;
+
+  if (severeRoll) {
     return { ...fail, prompt: "FIX_ROLL", poseNear: false, poseReady: false };
   }
-  if (input.pitch > config.poseGuidance.pitchTooHighAbove) {
+  if (closeOnYaw && Math.abs(input.roll) > config.poseGuidance.rollCorrectAbove) {
+    return { ...fail, prompt: "FIX_ROLL", poseNear: false, poseReady: false };
+  }
+  if (closeOnYaw && input.pitch > config.poseGuidance.pitchTooHighAbove) {
     return { ...fail, prompt: "PITCH_DOWN", poseNear: false, poseReady: false };
   }
-  if (input.pitch < config.poseGuidance.pitchTooLowBelow) {
+  if (closeOnYaw && input.pitch < config.poseGuidance.pitchTooLowBelow) {
     return { ...fail, prompt: "PITCH_UP", poseNear: false, poseReady: false };
   }
 
-  const yawHint = pickYawPrompt(input.yaw, targets);
+  const yawHint = pickYawPrompt(
+    input.yaw,
+    targets,
+    extras.yawDelta ?? 0,
+    config,
+  );
   if (yawHint) {
     return { ...fail, prompt: yawHint, poseNear: false, poseReady: false };
   }
@@ -106,10 +164,23 @@ export function pickPrompt(
     return { ...fail, prompt: "CLEAR_HAIR" };
   }
   if (qualityKind === "light") {
+    if (
+      input.quality &&
+      input.quality.brightness > config.ready.brightnessMax
+    ) {
+      return { ...fail, prompt: "TOO_BRIGHT" };
+    }
+    if (
+      input.quality &&
+      input.quality.brightness < config.ready.brightnessMin
+    ) {
+      return { ...fail, prompt: "TOO_DARK" };
+    }
     return { ...fail, prompt: "BAD_LIGHT" };
   }
 
-  const allowCapture = poseReady && stable && qualityKind === "ok";
+  const allowCapture =
+    poseReady && stable && qualityKind === "ok" && nearPeakScore;
   if (allowCapture) {
     return { ...fail, prompt: "READY", allowCapture: true };
   }
@@ -120,11 +191,12 @@ export function evaluateGuidance(
   input: GuidanceInput,
   config: PoseConfig,
   side: EffectiveTargets["side"],
-  offset: number,
+  personalBest: PeakSample | null,
   stableFrames: number,
+  extras: GuidanceExtras = {},
 ): GuidanceResult {
-  const targets = effectiveTargets(side, offset, config);
-  return pickPrompt(input, config, targets, stableFrames);
+  const targets = effectiveTargets(side, personalBest, config);
+  return pickPrompt(input, config, targets, stableFrames, extras);
 }
 
 export function isAngleStable(
@@ -134,9 +206,8 @@ export function isAngleStable(
 ): boolean {
   if (!previous) return false;
   return (
-    Math.abs(current.yaw - previous.yaw) < config.stability.maxDeltaYawDeg &&
-    Math.abs(current.pitch - previous.pitch) <
-      config.stability.maxDeltaPitchDeg &&
-    Math.abs(current.roll - previous.roll) < config.stability.maxDeltaRollDeg
+    Math.abs(current.yaw - previous.yaw) < config.ready.maxDeltaYawDeg &&
+    Math.abs(current.pitch - previous.pitch) < config.ready.maxDeltaPitchDeg &&
+    Math.abs(current.roll - previous.roll) < config.ready.maxDeltaRollDeg
   );
 }

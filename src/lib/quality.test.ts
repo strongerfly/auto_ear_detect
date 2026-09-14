@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyEarQuality, measureEarQuality } from "./quality";
+import { classifyEarQuality, frontalQualityScore, measureEarQuality, qualityAlongYawCurve } from "./quality";
 import { poseConfig } from "../config";
 
 function solid(
@@ -23,7 +23,7 @@ describe("ear ROI quality", () => {
     expect(q.laplacian).toBeLessThan(1);
     expect(q.edgeEnergy).toBeLessThan(1);
     expect(q.brightness).toBeCloseTo(128, 0);
-    expect(classifyEarQuality(q, poseConfig.earRoiQuality)).toBe("hair");
+    expect(classifyEarQuality(q, poseConfig)).toBe("hair");
   });
 
   it("striped pattern is sharp with mid brightness", () => {
@@ -44,6 +44,18 @@ describe("ear ROI quality", () => {
     const q = measureEarQuality({ data, width: w, height: h });
     expect(q.laplacian).toBeGreaterThan(100);
     expect(q.edgeEnergy).toBeGreaterThan(15);
-    expect(classifyEarQuality(q, poseConfig.earRoiQuality)).toBe("ok");
+    expect(classifyEarQuality(q, poseConfig)).toBe("ok");
+    expect(frontalQualityScore(q, 45)).toBeGreaterThan(0.7);
+  });
+
+  it("yaw curve peaks at the requested angle and drops at 80 when peak is 45", () => {
+    const peak = { laplacian: 180, brightness: 120, edgeEnergy: 40 };
+    const at45 = qualityAlongYawCurve(45, 45, peak);
+    const at80 = qualityAlongYawCurve(80, 45, peak);
+    expect(at45.laplacian).toBeCloseTo(180, 5);
+    expect(at80.laplacian).toBeLessThan(poseConfig.score.sharp.laplacianMinRaw);
+    expect(frontalQualityScore(at45, 45)).toBeGreaterThan(
+      frontalQualityScore(at80, 80),
+    );
   });
 });
