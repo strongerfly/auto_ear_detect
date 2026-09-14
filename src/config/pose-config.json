@@ -39,7 +39,8 @@
     "tieBreak": "smallerAbsYaw",
     "priorYawAbs": 60,
     "guidanceCoarseAbsError": 22,
-    "slowYawDeltaDeg": 18
+    "slowYawDeltaDeg": 18,
+    "uxNote": "yawAbsMax is 90, not 100: the landmarker drops near 90°, so a wider window is untrackable noise. Prefer 35–90; do not widen just to match an older table."
   },
   "score": {
     "weights": { "sharp": 0.45, "struct": 0.35, "content": 0.20 },
@@ -70,7 +71,8 @@
     "pickBurstBy": "score",
     "requireUserConfirm": false,
     "pitchMaxAbs": 10,
-    "rollMaxAbs": 8
+    "rollMaxAbs": 8,
+    "uxNote": "bandDegAroundBest 5 is the enter gate (QA ±5°). exitBandDeg 8 is READY hysteresis so a 1–2° wobble does not flicker — not a wider enter band and not a 70–90 stand-in."
   },
   "personalBest": {
     "persistSessionOffset": true,

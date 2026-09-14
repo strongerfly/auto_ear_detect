@@ -10,6 +10,8 @@ Chinese twin: [LIMITS.zh-CN.md](./LIMITS.zh-CN.md). Interaction checklist: [ear-
 
 Head pose from MediaPipe is for **direction**. Ear-ROI sharpness/structure is how we judge “is this ear frontal *for this person*?”. We search a trackable side-turn range instead of locking 70–90°.
 
+**Numbers vs UX:** search max is **90** (not 100) because tracking dies there — not because a table said so. READY **enters at ±5°** of `bestYaw`. `exitBandDeg` **8°** is kept on purpose so READY does not flicker; it is hysteresis, not a looser enter gate.
+
 ---
 
 ## 卡点 / Blockers

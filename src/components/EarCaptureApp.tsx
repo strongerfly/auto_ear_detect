@@ -107,6 +107,18 @@ export function EarCaptureApp() {
   useEffect(() => {
     hadTrackedFace.current = false;
     searchStartedAt.current = null;
+    dwellRef.current = INITIAL_DWELL;
+    wasPoseReady.current = false;
+    burstRing.current = [];
+    readyBurst.current = 0;
+    shutterLatch.current = false;
+    lastAngles.current = null;
+    stableFrames.current = 0;
+    smootherRef.current?.reset();
+    setLive({
+      ...INITIAL_LIVE,
+      prompt: side === "rightEar" ? "SWEEP_RIGHT_EAR" : "SWEEP_LEFT_EAR",
+    });
   }, [side]);
 
   const personalBest = bests[side];

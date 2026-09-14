@@ -515,7 +515,7 @@ describe("quality-driven personal best yaw", () => {
 });
 
 describe("QA precheck: search 35–90, READY ±5°, never 70–90 alone", () => {
-  it("searchYawMaxAbs is 90 on both ears, not 100", () => {
+  it("keeps exit ±8 for hysteresis; does not keep search max 100 or user confirm", () => {
     expect(poseConfig.search.rightEar.yawAbsMin).toBe(35);
     expect(poseConfig.search.rightEar.yawAbsMax).toBe(90);
     expect(poseConfig.search.leftEar.yawAbsMin).toBe(35);
@@ -523,6 +523,11 @@ describe("QA precheck: search 35–90, READY ±5°, never 70–90 alone", () => 
     expect(yawInSearchWindow(90, "rightEar")).toBe(true);
     expect(yawInSearchWindow(100, "rightEar")).toBe(false);
     expect(yawInSearchWindow(95, "rightEar")).toBe(false);
+    expect(poseConfig.ready.bandDegAroundBest).toBe(5);
+    expect(poseConfig.ready.exitBandDeg).toBe(8);
+    expect(poseConfig.ready.requireUserConfirm).toBe(false);
+    expect(poseConfig.search.uxNote.toLowerCase()).toContain("100");
+    expect(poseConfig.ready.uxNote.toLowerCase()).toContain("hysteresis");
   });
 
   it("readyMaxAbsYawError / bandDegAroundBest is 5 (exit 8 is hysteresis only)", () => {

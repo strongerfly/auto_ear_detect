@@ -10,6 +10,8 @@ Capture mode: `qualityPeakYaw`（`src/config/pose-config.json`）。READY **不�
 
 用 MediaPipe 头部位姿做**方向**，用耳区 ROI 的清晰度/结构分判断「这只耳朵对这个人够不够正」。在可跟踪的侧转范围里搜峰值，而不是卡死 70–90°。
 
+**数字对交互：** 搜索上限是 **90**（不是 100），因为跟踪在那里会丢——不是表格要求。READY **进入 ±5°** 个人 `bestYaw`。`exitBandDeg` **8°** 是故意留的滞后，避免 READY 闪烁，不是更松的进入门。
+
 ---
 
 ## 卡点 / Blockers

@@ -78,7 +78,15 @@ READY when all of:
 
 No “confirm the ear is frontal” step. Auto-shutter is optional and off by default; when on, it waits 3 ready frames and **keeps the highest-score still**. **Relearn this side** clears the stored peak; learning itself is automatic.
 
-While still learning (no locked peak), prompts stay on the sweep intro — a 60° prior never fires TURN_BACK / HOLD. Absolute yaw is hidden in a debug disclosure; the normal UI does not show a target degree.
+While still learning (no locked peak), prompts stay on the sweep intro — a 60° prior never fires TURN_BACK / HOLD. Absolute yaw is hidden in a debug disclosure; the normal UI does not show a target degree. Switching Left/Right ear resets dwell so the matching sweep intro shows immediately.
+
+### Why these numbers (interaction, not a table)
+
+Prefer search \|yaw\| **35–90** and READY **enter ±5°** around personal best. Hard bars that we will not trade away: a **~45°** peak can READY; **70–90 with no locked peak cannot**; we never ask the user for their angle.
+
+We did **not** keep search max=100. Tracker drop near 90° makes that extra band mostly noise.
+
+We **did** keep `exitBandDeg` **8°** after enter-at-5°. That ±8 is hysteresis so READY does not flicker on a 1–2° wobble. It is not a wider enter gate and not a stand-in for 70–90.
 
 ## Ceiling vs cannot-do（上限与做不到）
 

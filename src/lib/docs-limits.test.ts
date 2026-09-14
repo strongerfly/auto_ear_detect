@@ -44,5 +44,7 @@ describe("product-owner LIMITS structure", () => {
     expect(zh).toContain("能实现的天花板");
     expect(en).toMatch(/Explicitly not solved|明确做不到的/);
     expect(zh).toContain("明确做不到的");
+    expect(en).toMatch(/hysteresis|exitBandDeg/);
+    expect(zh).toContain("滞后");
   });
 });
