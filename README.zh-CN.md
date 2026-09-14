@@ -92,7 +92,7 @@ Euler 顺序为 **YXZ**（内旋 `R = Ry · Rx · Rz`），单位为**度**。4�
 |--------|--------|
 | 搜索 / 偏好带 | `search.yawAbsMin` / `yawAbsMax` / `preferredAbs*` |
 | 就绪 vs 个人峰值 | `ready.bandDegAroundBest`、`ready.scoreRatioOfBest` |
-| 减少闪烁 | `promptUx.minDwellMs`、`crossFamilyDwellMs`、`smoothing.oneEuro` |
+| 减少闪烁 | `promptUx.minDwellMs`、`crossFamilyDwellMs`、`slowDownPreemptMs`、`slowDownHoldMs`、`smoothing.oneEuro` |
 | 清晰度下限 | `score.sharp`、`score.struct` |
 | 文案 | `src/i18n/messages.ts` |
 

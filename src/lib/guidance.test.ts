@@ -518,7 +518,74 @@ describe("prompt dwell", () => {
   it("promotes READY faster than cross-family switches", () => {
     const ux = poseConfig.promptUx;
     expect(dwellMsFor("TURN_MORE", "READY", ux)).toBe(ux.readyPromoteMs);
+    expect(dwellMsFor("TURN_MORE", "SOFT_READY", ux)).toBe(ux.readyPromoteMs);
+    expect(dwellMsFor("TURN_MORE", "STUCK_NO_PROGRESS", ux)).toBe(
+      ux.readyPromoteMs,
+    );
     expect(dwellMsFor("TURN_MORE", "TURN_BACK", ux)).toBe(ux.minDwellMs);
     expect(dwellMsFor("NO_FACE", "TURN_MORE", ux)).toBe(ux.crossFamilyDwellMs);
+  });
+
+  it("SLOW_DOWN preempts SWEEP/TURN_MORE dwell, not TURN_BACK or NEAR_PEAK", () => {
+    const ux = poseConfig.promptUx;
+    expect(dwellMsFor("SWEEP_RIGHT_EAR", "SLOW_DOWN", ux)).toBe(
+      ux.slowDownPreemptMs,
+    );
+    expect(dwellMsFor("SWEEP_LEFT_EAR", "SLOW_DOWN", ux)).toBe(
+      ux.slowDownPreemptMs,
+    );
+    expect(dwellMsFor("TURN_MORE", "SLOW_DOWN", ux)).toBe(ux.slowDownPreemptMs);
+    expect(dwellMsFor("TURN_BACK", "SLOW_DOWN", ux)).toBe(ux.minDwellMs);
+    expect(dwellMsFor("TURN_BACK_OVERSHOOT", "SLOW_DOWN", ux)).toBe(
+      ux.minDwellMs,
+    );
+    expect(dwellMsFor("NEAR_PEAK", "SLOW_DOWN", ux)).toBe(ux.crossFamilyDwellMs);
+    expect(dwellMsFor("SLOW_DOWN", "SWEEP_RIGHT_EAR", ux)).toBe(ux.slowDownHoldMs);
+    expect(dwellMsFor("SLOW_DOWN", "TURN_MORE", ux)).toBe(ux.slowDownHoldMs);
+    expect(dwellMsFor("SLOW_DOWN", "TURN_BACK", ux)).toBe(ux.minDwellMs);
+  });
+
+  it("large per-frame Δyaw surfaces SLOW_DOWN despite active SWEEP dwell", () => {
+    const ux = poseConfig.promptUx;
+    // Unlocked hunt: SWEEP is on screen and still inside its dwell window.
+    let dwell = dwellPrompt(INITIAL_DWELL, "SWEEP_RIGHT_EAR", 0, ux);
+    dwell = dwellPrompt(dwell, "SWEEP_RIGHT_EAR", 200, ux);
+    expect(dwell.displayed).toBe("SWEEP_RIGHT_EAR");
+
+    const jumped = evaluateGuidance(
+      base({ yaw: 70 }),
+      poseConfig,
+      "rightEar",
+      null,
+      0,
+      { yawDelta: 50 }, // 20° → 70° in one frame
+    );
+    expect(jumped.prompt).toBe("SLOW_DOWN");
+    expect(jumped.allowCapture).toBe(false);
+    expect(jumped.targets.locked).toBe(false);
+
+    dwell = dwellPrompt(dwell, jumped.prompt, 216, ux);
+    expect(dwell.displayed).toBe("SLOW_DOWN");
+
+    // Next frame Δyaw settles; SWEEP is picked again but SLOW_DOWN stays
+    // through same-family dwell so the hint is actually readable.
+    const settled = evaluateGuidance(
+      base({ yaw: 70 }),
+      poseConfig,
+      "rightEar",
+      null,
+      0,
+      { yawDelta: 0 },
+    );
+    expect(settled.prompt).toBe("SWEEP_RIGHT_EAR");
+    dwell = dwellPrompt(dwell, settled.prompt, 250, ux);
+    expect(dwell.displayed).toBe("SLOW_DOWN");
+    expect(settled.allowCapture).toBe(false);
+
+    const holdUntil = 250 + ux.slowDownHoldMs;
+    dwell = dwellPrompt(dwell, settled.prompt, holdUntil - 1, ux);
+    expect(dwell.displayed).toBe("SLOW_DOWN");
+    dwell = dwellPrompt(dwell, settled.prompt, holdUntil, ux);
+    expect(dwell.displayed).toBe("SWEEP_RIGHT_EAR");
   });
 });

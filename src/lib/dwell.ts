@@ -16,6 +16,10 @@ export type DwellUx = {
   minDwellMs: number;
   crossFamilyDwellMs?: number;
   readyPromoteMs?: number;
+  /** Immediate switch from SWEEP/TURN_MORE onto SLOW_DOWN (QA: fast-turn hint). */
+  slowDownPreemptMs?: number;
+  /** Keep SLOW_DOWN on screen after Δyaw settles, so a one-frame spike is readable. */
+  slowDownHoldMs?: number;
 };
 
 type Family =
@@ -67,12 +71,28 @@ function familyOf(prompt: PromptKey): Family {
   }
 }
 
+function isKeepTurning(prompt: PromptKey | null): boolean {
+  return (
+    prompt === "SWEEP_RIGHT_EAR" ||
+    prompt === "SWEEP_LEFT_EAR" ||
+    prompt === "TURN_MORE"
+  );
+}
+
 export function dwellMsFor(
   from: PromptKey | null,
   to: PromptKey,
   ux: DwellUx,
 ): number {
   if (from === null) return 0;
+  // Fast-turn is more urgent than "keep sweeping": a one-frame Δyaw spike
+  // must surface SLOW_DOWN instead of leaving SWEEP pinned for minDwellMs.
+  if (to === "SLOW_DOWN" && isKeepTurning(from)) {
+    return ux.slowDownPreemptMs ?? 0;
+  }
+  if (from === "SLOW_DOWN" && isKeepTurning(to)) {
+    return ux.slowDownHoldMs ?? ux.minDwellMs;
+  }
   if (to === "READY" || to === "SOFT_READY" || to === "STUCK_NO_PROGRESS") {
     return ux.readyPromoteMs ?? 200;
   }
@@ -80,7 +100,7 @@ export function dwellMsFor(
   return ux.crossFamilyDwellMs ?? ux.minDwellMs;
 }
 
-/** Hold a prompt before switching (anti-flicker). READY promotes faster. */
+/** Hold a prompt before switching (anti-flicker). READY promotes faster; SLOW_DOWN preempts SWEEP. */
 export function dwellPrompt(
   state: DwellState,
   picked: PromptKey,

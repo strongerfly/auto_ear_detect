@@ -82,6 +82,8 @@
     "crossFamilyDwellMs": 700,
     "readyPromoteMs": 200,
     "sideIntroMs": 2800,
+    "slowDownPreemptMs": 0,
+    "slowDownHoldMs": 900,
     "onlyOnePrompt": true
   },
   "failure": {
