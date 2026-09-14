@@ -58,10 +58,44 @@ User-facing strings live in `src/i18n/`. Unlocked prompts do not steer `TURN_MOR
 
 Guidance is one short line (中文 / English in the app). Switching left/right resets shutter, dwell, and guidance and shows a body-side intro; the other side’s stored peak is kept. While the peak is still unknown we only **sweep** (no prior-driven “a little more / ease back”). `SLOW_DOWN` can preempt a sweep line on a fast yaw jump, then yields back to SWEEP on a short window (`slowDownHoldMs`=200, same idea as READY’s `readyPromoteMs`) so 「转慢一点」 does not sit for a full yaw-family `minDwellMs`. After lock, going past `bestYaw` by `overshootPastBestDeg` with a score drop says ease back; returning toward best is HOLD, not MORE. Near a locked peak but not yet stable the shutter stays grey and uses **NEAR_PEAK** (「快到了…」), never **HOLD_STILL**. READY hysteresis: enter ±5° / leave ±8°. Auto-shutter is a cancelable `autoshutterMs` countdown after Ready. After a shot, feedback is relative to the remembered peak (no absolute degrees), with retake / other ear. Absolute yaw/pitch/roll numbers stay behind a debug toggle.
 
-## Leftover cannot-do (this pass)
+## Cannot-do + breakthrough conditions (1–8)
 
-- Timeout cannot tell hair vs light vs tracker drop vs a false peak — it only notices no score/peak improvement.
-- Ear-out-of-frame is a clipped-ROI heuristic, not ear segmentation.
-- Soft-success is a score-span / weak-peak heuristic, not a clinical “this isn’t an ear” gate.
-- Auto-shutter still does not keep a 3-frame still buffer and pick the sharpest.
-- No dedicated ear detector; a hair/background false peak can still lock (Relearn is the recovery).
+1) One “standard angle” for everyone
+Cannot-do: Fixed 70–90 as READY.
+To break through: Tighten preferred after population profile-angle distribution data (still not a hard READY).
+
+2) Medical meatus / otoscope-grade
+Cannot-do: Today we only optimize a clear, stable pinna frame.
+To break through: A separate meatus ROI/model + clinical definition and informed consent.
+
+3) No false peaks
+Cannot-do: Without ear segmentation, hair/background can beat a real pinna.
+To break through: Profile ear segmentation or occlusion model + labels by angle.
+
+4) True peak outside the window (|yaw|<35 or >90)
+Cannot-do: Search cannot sample outside the window; high yaw easily loses tracking.
+To break through: FOV calibration to widen the window; freeze last-good / PnP on track loss.
+
+5) System automatically switching the selected left/right ear
+Cannot-do: Product contract is that the user taps to choose; a wrong tap is not self-checked.
+To break through: A reliable left/right ear classifier (latency acceptable).
+
+6) Cross-device absolute sharpness threshold
+Cannot-do: Laplacian is tied to camera/exposure.
+To break through: Boot-time blur calibration (flat/palm).
+
+7) Automatically decide “should relearn”
+Cannot-do: We do not know about haircut/glasses changes.
+To break through: Long-term same-person same-device signals.
+
+8) timeout cannot explain “why we are stuck”
+Cannot-do: Only “not found this time” + change light / clear hair / relearn.
+To break through: An attributable quality head or segmentation.
+
+## Next cuts within the ceiling (shippable; not items 1–8 above)
+- #7 string-key alignment landed
+- First-run side pick
+- More-perceptible soft-success
+- Copy polish after simulator defaults to collapsed (simulator default collapsed already done)
+
+Note: Items 1–8 are documentation-only (no implementation tickets). In “next cuts,” the #7 string-key alignment is already on main; the other three eng tickets (first-run side pick / more-perceptible soft-success / simulator copy polish) are owned by the lead and sequenced A→B→C.
