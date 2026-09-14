@@ -12,12 +12,14 @@ Stack: **Vite + React + TypeScript** + `@mediapipe/tasks-vision` Face Landmarker
 
 ## How to use
 
-1. Allow the camera. Switch language in the header if you want.
-2. Tap **Left ear** or **Right ear** (your body, not the mirror). Switching sides restarts shutter/guidance for that ear and keeps the other side’s remembered angle. Right ear → turn left; left ear → turn right.
-3. Turn your **head** slowly (not the laptop/phone) until the ear looks clearest. The first sweep is how the app learns that side; capture stays off until then.
-4. Wait for **Ready to capture** (a softer “clearest we found” state is distinct if the peak is weak). Auto-shutter is on by default and counts down — tap **Cancel auto-capture** if you need to stop it. After a shot you’ll see whether it was near the clearest angle (no degrees), then **Retake** or **Shoot the other ear**.
+1. Allow the camera. If it was denied, allow this site in your browser settings. Switch **中文 / English** in the header if you want.
+2. Tap **Left ear** or **Right ear** (your body, not the mirror). Switching sides restarts shutter/guidance for that ear and keeps the other side’s remembered angle. Right ear → turn your head left; left ear → turn your head right. Follow the prompt; don’t copy the mirror.
+3. Turn your **head** slowly (not the laptop/phone). The first sweep is how the app learns that side; capture stays off until then. If you turn too fast, it asks you to slow down.
+4. Overshoot is normal: “ease back” means toward the clearer pose, not past the back of your head. At the far edge you’ll see “that’s as far as it goes — ease back.”
+5. Wait for **Ready to capture** (a softer “clearest we found” state is distinct if the peak is weak). Auto-shutter is on by default and counts down — tap **Cancel auto-capture** if you need to stop it. After a shot you’ll see whether it was near the clearest angle (no degrees), then **Retake** or **Shoot the other ear**.
+6. After one ear, tap the other side and turn again. The app won’t switch for you. If the box is on the other ear, tap the other tab — that’s not the same as the “other way” (turn direction) prompt.
 
-If the remembered angle is wrong, use **Relearn this side** (confirm once) and turn slowly once more. If nothing gets clearer for a while, you’ll get **Try again** / Relearn / tuck hair and find better light — not a dead grey shutter. Expand **Instructions** in the app for overshoot, camera permission, and limits.
+If the lock is wrong, you changed glasses or hair, or you never reach Ready, use **Relearn this side** (confirm once; clears this side only) and turn slowly once more. An accidental confirm blocks capture until that side is relearned. If nothing gets clearer for a while, you’ll get **Try again** / Relearn / tuck hair and find better light — not a dead grey shutter. Expand **Instructions** in the app for the rest.
 
 ## Run
 
