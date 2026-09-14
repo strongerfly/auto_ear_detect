@@ -15,7 +15,7 @@ This is the interaction companion to [LIMITS.md](./LIMITS.md) (technical ceiling
 | HUD | Three-state: learning / hold-near-peak / ready | Absolute yaw / bestYaw on the normal HUD (those live in the debug fold only) |
 | Capture button | Grey while learning or holding; green only on READY | HOLD_STILL while still learning |
 | Auto-shutter | First run **off**; when on, 3-frame burst pick-by-score then cancelable `autoshutterMs` | Surprise instant shutter on the first visit |
-| Relearn | Confirm dialog, then sweep intro | Copy that says 校准 / “calibrate”; silent wipe |
+| Relearn | Confirm dialog, then sweep intro until the user turns ~15° | Copy that says 校准 / “calibrate”; silent wipe |
 
 ## Shipped P0 (this pass)
 
@@ -25,7 +25,7 @@ This is the interaction companion to [LIMITS.md](./LIMITS.md) (technical ceiling
 4. No absolute yaw/best in the normal HUD; numbers are behind **Debug: angle numbers**.
 5. Grey button / prompt three-state: learning vs hold-near-peak vs ready.
 6. Auto-shutter: default off first run + cancelable countdown; burst still pick-by-score.
-7. Relearn: confirm, then sweep intro; no 校准 wording.
+7. Relearn: confirm, then sweep intro until the user turns ~15° (`search.relearnSweepMinDeg`); no 校准 wording.
 
 ## Remaining gaps (not P0 / still ceiling)
 
