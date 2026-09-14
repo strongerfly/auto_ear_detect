@@ -540,8 +540,14 @@ describe("prompt dwell", () => {
       ux.minDwellMs,
     );
     expect(dwellMsFor("NEAR_PEAK", "SLOW_DOWN", ux)).toBe(ux.crossFamilyDwellMs);
+    // Yield back to SWEEP on the short promote window, not yaw-family minDwell.
     expect(dwellMsFor("SLOW_DOWN", "SWEEP_RIGHT_EAR", ux)).toBe(ux.slowDownHoldMs);
+    expect(dwellMsFor("SLOW_DOWN", "SWEEP_LEFT_EAR", ux)).toBe(ux.slowDownHoldMs);
     expect(dwellMsFor("SLOW_DOWN", "TURN_MORE", ux)).toBe(ux.slowDownHoldMs);
+    expect(dwellMsFor("SLOW_DOWN", "SWEEP_RIGHT_EAR", ux)).toBeLessThan(
+      ux.minDwellMs,
+    );
+    expect(ux.slowDownHoldMs).toBeLessThan(ux.minDwellMs);
     expect(dwellMsFor("SLOW_DOWN", "TURN_BACK", ux)).toBe(ux.minDwellMs);
   });
 
@@ -567,8 +573,8 @@ describe("prompt dwell", () => {
     dwell = dwellPrompt(dwell, jumped.prompt, 216, ux);
     expect(dwell.displayed).toBe("SLOW_DOWN");
 
-    // Next frame Δyaw settles; SWEEP is picked again but SLOW_DOWN stays
-    // through same-family dwell so the hint is actually readable.
+    // Next frame Δyaw settles; SWEEP is picked again. SLOW_DOWN may stay for
+    // the short promote window, then must yield — not a full yaw-family dwell.
     const settled = evaluateGuidance(
       base({ yaw: 70 }),
       poseConfig,
@@ -587,5 +593,8 @@ describe("prompt dwell", () => {
     expect(dwell.displayed).toBe("SLOW_DOWN");
     dwell = dwellPrompt(dwell, settled.prompt, holdUntil, ux);
     expect(dwell.displayed).toBe("SWEEP_RIGHT_EAR");
+    // Old same-family minDwell (400ms from candidate start at 250) would still
+    // be holding SLOW_DOWN here; the short window must already have yielded.
+    expect(holdUntil).toBeLessThan(250 + ux.minDwellMs);
   });
 });

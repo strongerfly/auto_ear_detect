@@ -83,7 +83,7 @@
     "readyPromoteMs": 200,
     "sideIntroMs": 2800,
     "slowDownPreemptMs": 0,
-    "slowDownHoldMs": 900,
+    "slowDownHoldMs": 200,
     "onlyOnePrompt": true
   },
   "failure": {
