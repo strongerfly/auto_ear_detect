@@ -40,12 +40,20 @@ import {
   type PersonalBestMap,
 } from "../lib/personal-best";
 import { captureFeedbackFor, otherEar, type CaptureFeedback } from "../lib/capture-feedback";
+import {
+  gateCapture,
+  isSideChosen,
+  loadChosenSide,
+  saveChosenSide,
+} from "../lib/chosen-side";
 import { createProgress, retryProgress, stepProgress } from "../lib/progress";
 import { frontalQualityScore, measureEarQuality, qualityAlongYawCurve } from "../lib/quality";
 import {
   EMPTY_SWEEP,
+  clearPeakForSide,
   introPromptFor,
   isSoftPeak,
+  keepPeaksOnSideSwitch,
   noteSweepSample,
   pickPromptDuringIntro,
   sideIntroUntil,
@@ -71,7 +79,7 @@ const INITIAL_LIVE: LiveState = {
   yaw: null,
   pitch: null,
   roll: null,
-  prompt: "INTRO_RIGHT",
+  prompt: "PICK_SIDE",
   allowCapture: false,
   roi: null,
   quality: null,
@@ -93,7 +101,7 @@ export function EarCaptureApp() {
   const tRef = useRef(t);
   tRef.current = t;
 
-  const [side, setSide] = useState<EarSide>("rightEar");
+  const [side, setSide] = useState<EarSide | null>(() => loadChosenSide());
   const [bests, setBests] = useState<PersonalBestMap>(() => loadPersonalBests());
   const [autoShutter, setAutoShutter] = useState(true);
   const [debugHud, setDebugHud] = useState(false);
@@ -103,7 +111,13 @@ export function EarCaptureApp() {
     null,
   );
   const [sim, setSim] = useState<SimState>(DEFAULT_SIM);
-  const [live, setLive] = useState<LiveState>(INITIAL_LIVE);
+  const [live, setLive] = useState<LiveState>(() => {
+    const stored = loadChosenSide();
+    return {
+      ...INITIAL_LIVE,
+      prompt: stored ? introPromptFor(stored) : "PICK_SIDE",
+    };
+  });
   const [status, setStatus] = useState(() => t("loadingLandmarker"));
 
   const sideRef = useRef(side);
@@ -166,18 +180,23 @@ export function EarCaptureApp() {
   const selectSide = useCallback(
     (next: EarSide) => {
       if (next === sideRef.current) return;
+      // Keep both peaks; resetSideSession only clears shutter / dwell / intro.
+      bestsRef.current = keepPeaksOnSideSwitch(bestsRef.current);
       sideRef.current = next;
       setSide(next);
+      saveChosenSide(next);
       resetSideSession(next);
     },
     [resetSideSession],
   );
 
   useEffect(() => {
+    const current = sideRef.current;
+    if (!current) return;
     const now = performance.now();
     introUntilRef.current = sideIntroUntil(now);
     progressRef.current = createProgress(now);
-    const intro = introPromptFor(sideRef.current);
+    const intro = introPromptFor(current);
     dwellRef.current = {
       displayed: intro,
       candidate: intro,
@@ -185,9 +204,9 @@ export function EarCaptureApp() {
     };
   }, []);
 
-  const personalBest = bests[side];
+  const personalBest = side ? bests[side] : null;
   const captureUi = captureUiFor(personalBest !== null, live.allowCapture);
-  const captureHint = t(captureHintKey(captureUi));
+  const captureHint = side ? t(captureHintKey(captureUi)) : t("PICK_SIDE");
   const promptText =
     live.captured && !live.stuck
       ? captureFeedback?.grade === "offPeak"
@@ -199,6 +218,8 @@ export function EarCaptureApp() {
   liveRef.current = live;
 
   const captureStill = useCallback(() => {
+    const chosen = sideRef.current;
+    if (!isSideChosen(chosen)) return;
     const video = videoRef.current;
     const canvas = document.createElement("canvas");
     const snap = liveRef.current;
@@ -212,13 +233,13 @@ export function EarCaptureApp() {
         ctx,
         canvas.width,
         canvas.height,
-        sideRef.current,
+        chosen,
         simRef.current,
         snap.yaw,
         snap.pitch,
         snap.roll,
-        label(sideRef.current === "rightEar" ? "simStillRight" : "simStillLeft"),
-        label(sideRef.current === "rightEar" ? "roiRight" : "roiLeft"),
+        label(chosen === "rightEar" ? "simStillRight" : "simStillLeft"),
+        label(chosen === "rightEar" ? "roiRight" : "roiLeft"),
       );
     } else {
       canvas.width = video.videoWidth;
@@ -232,13 +253,13 @@ export function EarCaptureApp() {
     shutterLatch.current = true;
     countdownStartedAt.current = null;
     capturedThisSideRef.current = true;
-    const peak = bestsRef.current[sideRef.current];
+    const peak = bestsRef.current[chosen];
     const capturedScore =
       snap.quality && snap.yaw != null
         ? frontalQualityScore(snap.quality, snap.yaw)
         : (peak?.score ?? 0);
     setCaptureFeedback(
-      captureFeedbackFor(sideRef.current, capturedScore, peak?.score ?? null),
+      captureFeedbackFor(chosen, capturedScore, peak?.score ?? null),
     );
   }, [videoRef]);
 
@@ -265,6 +286,15 @@ export function EarCaptureApp() {
       const simState = simRef.current;
       const video = videoRef.current;
       const overlay = overlayRef.current;
+
+      if (!isSideChosen(currentSide)) {
+        setLive({
+          ...INITIAL_LIVE,
+          prompt: "PICK_SIDE",
+        });
+        return;
+      }
+
       const roiLabel = tRef.current(
         currentSide === "rightEar" ? "roiRight" : "roiLeft",
       );
@@ -470,8 +500,12 @@ export function EarCaptureApp() {
         paused: inIntro || capturedThisSideRef.current,
       });
       const stuck = progressRef.current.stuck;
-      const allowCapture =
-        guidance.allowCapture && !stuck && !capturedThisSideRef.current;
+      const allowCapture = gateCapture({
+        side: currentSide,
+        guidanceAllowCapture: guidance.allowCapture,
+        stuck,
+        capturedThisSide: capturedThisSideRef.current,
+      });
 
       dwellRef.current = dwellPrompt(
         dwellRef.current,
@@ -545,12 +579,13 @@ export function EarCaptureApp() {
   }, [landmarker, videoRef]);
 
   const recalibrateSide = () => {
+    const current = sideRef.current;
+    if (!isSideChosen(current)) return;
     if (!relearnArmed) {
       setRelearnArmed(true);
       return;
     }
-    const current = sideRef.current;
-    const next = { ...bestsRef.current, [current]: null };
+    const next = clearPeakForSide(bestsRef.current, current);
     bestsRef.current = next;
     setBests(next);
     savePersonalBests(next);
@@ -559,10 +594,12 @@ export function EarCaptureApp() {
   };
 
   const retryStuck = () => {
+    const current = sideRef.current;
+    if (!isSideChosen(current)) return;
     const now = performance.now();
     progressRef.current = retryProgress(progressRef.current, now);
     introUntilRef.current = sideIntroUntil(now);
-    const intro = introPromptFor(sideRef.current);
+    const intro = introPromptFor(current);
     dwellRef.current = {
       displayed: intro,
       candidate: intro,
@@ -593,7 +630,7 @@ export function EarCaptureApp() {
   };
 
   const downloadCapture = () => {
-    if (!lastCapture) return;
+    if (!lastCapture || !side) return;
     const a = document.createElement("a");
     a.href = lastCapture;
     const tag = side === "rightEar" ? "right-ear" : "left-ear";
@@ -612,7 +649,7 @@ export function EarCaptureApp() {
   }, [camError, camReady, sim.enabled, t]);
 
   return (
-    <div className="app" data-locale={locale}>
+    <div className="app" data-locale={locale} data-side={side ?? "none"}>
       <header className="top">
         <div>
           <p className="eyebrow">Auto Ear Detect</p>
@@ -620,7 +657,11 @@ export function EarCaptureApp() {
         </div>
         <div className="top-actions">
           <LocaleSwitcher />
-          <div className="modes" role="tablist" aria-label={t("sideAriaLabel")}>
+          <div
+            className={`modes${side ? "" : " need-pick"}`}
+            role="tablist"
+            aria-label={t("sideAriaLabel")}
+          >
             <button
               type="button"
               role="tab"
@@ -657,15 +698,34 @@ export function EarCaptureApp() {
         />
         <canvas ref={overlayRef} className="overlay" />
         <canvas ref={sampleRef} className="scratch" />
-        <div
-          className="prompt"
-          data-ready={live.allowCapture && !live.softReady}
-          data-soft={live.softReady}
-          data-stuck={live.stuck}
-          data-captured={live.captured && !live.stuck}
-        >
-          {promptText}
-        </div>
+        {!side ? (
+          <div
+            className="side-pick"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="side-pick-title"
+          >
+            <p id="side-pick-title">{t("PICK_SIDE")}</p>
+            <div className="side-pick-actions">
+              <button type="button" onClick={() => selectSide("leftEar")}>
+                {t("shootLeftEar")}
+              </button>
+              <button type="button" onClick={() => selectSide("rightEar")}>
+                {t("shootRightEar")}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div
+            className="prompt"
+            data-ready={live.allowCapture && !live.softReady}
+            data-soft={live.softReady}
+            data-stuck={live.stuck}
+            data-captured={live.captured && !live.stuck}
+          >
+            {promptText}
+          </div>
+        )}
         {live.stuck ? (
           <div className="stuck-banner" role="status">
             <button type="button" className="stuck-retry" onClick={retryStuck}>
@@ -779,6 +839,7 @@ export function EarCaptureApp() {
         <button
           type="button"
           className={relearnArmed ? "ghost warn" : "ghost"}
+          disabled={!side}
           onClick={recalibrateSide}
         >
           {relearnArmed ? t("relearnConfirm") : t("relearn")}
@@ -797,7 +858,7 @@ export function EarCaptureApp() {
       {lastCapture ? (
         <figure className="preview">
           <figcaption>
-            {captureFeedback && captureFeedback.side === side ? (
+            {captureFeedback && side && captureFeedback.side === side ? (
               <>
                 <strong>
                   {captureFeedback.grade === "nearPeak"
@@ -810,7 +871,7 @@ export function EarCaptureApp() {
               t("lastCaptureCaption")
             )}
           </figcaption>
-          {captureFeedback && captureFeedback.side === side ? (
+          {captureFeedback && side && captureFeedback.side === side ? (
             <div className="preview-actions">
               <button type="button" className="capture" onClick={retake}>
                 {t("retake")}

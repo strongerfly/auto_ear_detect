@@ -13,7 +13,7 @@ Stack: **Vite + React + TypeScript** + `@mediapipe/tasks-vision` Face Landmarker
 ## How to use
 
 1. Allow the camera. If it was denied, allow this site in your browser settings. Switch **中文 / English** in the header if you want.
-2. Tap **Left ear** or **Right ear** (your body, not the mirror). Switching sides restarts shutter/guidance for that ear and keeps the other side’s remembered angle. Right ear → turn your head left; left ear → turn your head right. Follow the prompt; don’t copy the mirror.
+2. On first launch, choose **Left ear** or **Right ear** (your body, not the mirror) before anything can capture. The pick is stored in `localStorage` (`auto-ear-detect:chosen-side:v1`). Switching sides restarts shutter/guidance for that ear and keeps the other side’s remembered angle. Right ear → turn your head left; left ear → turn your head right. Follow the prompt; don’t copy the mirror.
 3. Turn your **head** slowly (not the laptop/phone). The first sweep is how the app learns that side; capture stays off until then. If you turn too fast, it asks you to slow down.
 4. Overshoot is normal: “ease back” means toward the clearer pose, not past the back of your head. At the far edge you’ll see “that’s as far as it goes — ease back.”
 5. Wait for **Ready to capture** (a softer “clearest we found” state is distinct if the peak is weak). Auto-shutter is on by default and counts down — tap **Cancel auto-capture** if you need to stop it. After a shot you’ll see whether it was near the clearest angle (no degrees), then **Retake** or **Shoot the other ear**.

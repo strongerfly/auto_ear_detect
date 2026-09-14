@@ -251,6 +251,30 @@ describe("string lookup", () => {
     );
   });
 
+  it("first-run side pick names body left/right with no degrees or 校准", () => {
+    expect(translate("zh", "PICK_SIDE")).toMatch(/身体/);
+    expect(translate("zh", "PICK_SIDE")).toMatch(/左/);
+    expect(translate("zh", "PICK_SIDE")).toMatch(/右/);
+    expect(translate("zh", "PICK_SIDE")).toMatch(/镜子|屏幕/);
+    expect(translate("en", "PICK_SIDE")).toMatch(/body/i);
+    expect(translate("en", "PICK_SIDE")).toMatch(/left|right/i);
+    expect(translate("en", "PICK_SIDE")).toMatch(/screen|mirror/i);
+    expect(looksLikeRigidAngleChecklist(translate("zh", "PICK_SIDE"))).toBe(
+      false,
+    );
+    expect(looksLikeRigidAngleChecklist(translate("en", "PICK_SIDE"))).toBe(
+      false,
+    );
+    expect(translate("zh", "PICK_SIDE")).not.toMatch(/校准/);
+    expect(translate("en", "PICK_SIDE").toLowerCase()).not.toMatch(/calibrat/);
+    expect(translate("zh", "PICK_SIDE")).not.toMatch(/\d+\s*°/);
+    expect(translate("en", "PICK_SIDE")).not.toMatch(/\d+\s*°/);
+    expect(translate("zh", "helpTurnBody")).toContain("没选之前不能拍");
+    expect(translate("en", "helpTurnBody").toLowerCase()).toContain(
+      "capture stays off until you pick a side",
+    );
+  });
+
   it("stuck copy offers retry, relearn, and hair/light — not a dead shutter", () => {
     expect(translate("zh", "STUCK_NO_PROGRESS")).toMatch(/头发|亮/);
     expect(translate("zh", "STUCK_NO_PROGRESS")).toMatch(/重新学习/);

@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { poseConfig } from "../config";
 import {
   EMPTY_SWEEP,
+  clearPeakForSide,
   introPromptFor,
   isSoftPeak,
+  keepPeaksOnSideSwitch,
   noteSweepSample,
   pickPromptDuringIntro,
   sideIntroUntil,
@@ -62,13 +64,23 @@ describe("soft peak vs READY", () => {
 });
 
 describe("keep the other side’s best", () => {
-  it("clearing one side leaves the stored peak on the other", () => {
-    const map = {
-      leftEar: { yaw: -45, score: 0.8 },
-      rightEar: { yaw: 45, score: 0.9 },
-    };
-    const afterRightReset = { ...map, rightEar: null };
+  const map = {
+    leftEar: { yaw: -45, score: 0.8 },
+    rightEar: { yaw: 45, score: 0.9 },
+  };
+
+  it("side switch keeps both peaks (session reset does not wipe them)", () => {
+    expect(keepPeaksOnSideSwitch(map)).toEqual(map);
+    expect(keepPeaksOnSideSwitch(map).leftEar).toEqual(map.leftEar);
+    expect(keepPeaksOnSideSwitch(map).rightEar).toEqual(map.rightEar);
+  });
+
+  it("relearn / clear on one side leaves the opposite peak", () => {
+    const afterRightReset = clearPeakForSide(map, "rightEar");
     expect(afterRightReset.leftEar).toEqual(map.leftEar);
     expect(afterRightReset.rightEar).toBeNull();
+    const afterLeftReset = clearPeakForSide(map, "leftEar");
+    expect(afterLeftReset.rightEar).toEqual(map.rightEar);
+    expect(afterLeftReset.leftEar).toBeNull();
   });
 });

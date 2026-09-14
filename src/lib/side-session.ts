@@ -1,8 +1,27 @@
 import type { EarSide, PromptKey } from "../config";
 import { poseConfig } from "../config";
+import type { PersonalBestMap } from "./personal-best";
 
 export function introPromptFor(side: EarSide): PromptKey {
   return side === "rightEar" ? "INTRO_RIGHT" : "INTRO_LEFT";
+}
+
+/**
+ * Side switch resets shutter / dwell / intro in the session, but peaks are
+ * per-ear and must pass through unchanged.
+ */
+export function keepPeaksOnSideSwitch(
+  bests: PersonalBestMap,
+): PersonalBestMap {
+  return { leftEar: bests.leftEar, rightEar: bests.rightEar };
+}
+
+/** Relearn clears only this ear’s peak; the opposite side is kept. */
+export function clearPeakForSide(
+  bests: PersonalBestMap,
+  side: EarSide,
+): PersonalBestMap {
+  return { ...bests, [side]: null };
 }
 
 export function sideIntroUntil(
