@@ -70,11 +70,11 @@ READY when all of:
 
 1. Face present, size in `[minFaceHeightRatio, maxFaceHeightRatio]`
 2. A personal **bestYaw** is locked for this side
-3. Current yaw within **±5°** of that best; pitch/roll inside ready limits
+3. Current yaw within **±5°** of that best (hysteresis leave **±8°**, `exitBandDeg`); pitch/roll inside ready limits
 4. Stable ~**12** frames
 5. Score ≥ **92%** of the personal peak, brightness in range
 
-No “confirm the ear is frontal” step. Auto-shutter waits 3 ready frames, then a **cancelable countdown**. **Relearn this side** asks for a second confirm before clearing the stored peak; learning itself is automatic. The absolute-angle HUD is hidden unless you turn on **Debug: show angles**.
+No “confirm the ear is frontal” step. Until a peak is locked, prompts are **sweep only** (no prior-driven turn-back). After lock, going past `bestYaw` by `overshootPastBestDeg` with a score drop says ease back; returning toward best is HOLD, not MORE. Auto-shutter waits 3 ready frames, then a cancelable **`autoshutterMs`** countdown. **Relearn this side** asks for a second confirm before clearing the stored peak; learning itself is automatic. The absolute-angle HUD is hidden unless you turn on **Debug: show angles**. Grey capture explains learning vs near-peak vs ready — grey hold uses **NEAR_PEAK** (「快到了…」), never **HOLD_STILL**. `minSweepCoverageRatio` is **not** a hard READY gate.
 
 ## Ceiling and shortfalls（上限与短板）
 
@@ -91,7 +91,9 @@ Numeric thresholds: **`src/config/pose-config.json`**. User-visible strings: **`
 | Want… | Touch |
 |--------|--------|
 | Search / preferred band | `search.yawAbsMin` / `yawAbsMax` / `preferredAbs*` |
-| READY vs personal peak | `ready.bandDegAroundBest`, `ready.scoreRatioOfBest` |
+| READY vs personal peak | `ready.bandDegAroundBest`, `ready.exitBandDeg`, `ready.scoreRatioOfBest` |
+| Overshoot past best | `search.overshootPastBestDeg` |
+| Auto-shutter countdown | `ready.autoshutterMs`, `ready.burstFrames` |
 | Less flicker | `promptUx.minDwellMs`, `crossFamilyDwellMs`, `slowDownPreemptMs`, `slowDownHoldMs`, `smoothing.oneEuro` |
 | Sharpness floor | `score.sharp`, `score.struct` |
 | Copy | `src/i18n/messages.ts` |

@@ -71,13 +71,20 @@ describe("string lookup", () => {
     expect(translate("en", "shootLeftEar")).toBe("Left ear");
     expect(translate("zh", "helpTitle")).toBe("使用说明");
     expect(translate("en", "helpTitle")).toBe("Instructions");
-    expect(translate("zh", "relearn")).toBe("重新学习此侧");
-    expect(translate("en", "relearn")).toBe("Relearn this side");
+    expect(translate("zh", "TURN_BACK_OVERSHOOT")).toBe(
+      "往回一点，刚才那边更清楚",
+    );
+    expect(translate("en", "TURN_BACK_OVERSHOOT")).toContain(
+      "it was clearer just now",
+    );
+    expect(translate("zh", "learningNote")).toContain("先慢转过头");
+    expect(translate("en", "learningNote").toLowerCase()).toContain("sweep slowly");
   });
 
   it("NEAR_PEAK does not tell the user to hold still", () => {
     expect(translate("zh", "NEAR_PEAK")).not.toMatch(/保持不动|很好，保持/);
     expect(translate("en", "NEAR_PEAK")).not.toMatch(/hold still/i);
+    expect(translate("zh", "NEAR_PEAK")).toContain("快到了");
     expect(translate("zh", "SWEEP_RIGHT_EAR")).toContain("慢慢向左转");
     expect(translate("zh", "HOLD_STILL")).toMatch(/保持不动/);
   });

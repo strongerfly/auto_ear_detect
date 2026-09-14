@@ -28,7 +28,7 @@ Head pose from MediaPipe is for **direction**. Ear-ROI sharpness/structure is ho
 - **Fixed 70–90 READY:** removed. Pose is guidance; READY is personal bestYaw.
 - **Ask “are you a 45° person?”:** will not. Peak is learned during a normal turn.
 - **Dedicated ear landmarks / 3D ear:** not wired. Face-mesh ear points are unreliable in profile, so we use head pose + ROI quality. Trigger: a stable profile ear-seg model within the latency budget.
-- **Require 60% window coverage before READY:** `minSweepCoverageRatio` is in config and **intentionally not a hard gate**, so a clear ear that peaks at ~45° can still READY. Documented as false-peak risk.
+- **Require 60% window coverage before READY:** `minSweepCoverageRatio` is in config and **intentionally not a hard gate**, so a clear ear that peaks at ~45° can still READY. Grey capture copy says to sweep slowly past the peak first (`learningNote`); false-peak risk stays here, not a READY block.
 - **45s no-progress timeout:** now a recovery narrative (`STUCK_NO_PROGRESS`) with **Try again** / **Relearn** / hair-light copy. Still not a hard fail, and it cannot diagnose *why* (hair vs light vs tracker vs false peak).
 - **Meatus-like dark-blob penalty:** weak center-brightness heuristic only. Without seg we cannot tell meatus from hair shadow.
 - **Ear-out-of-frame:** ROI clip ratio, not a real ear detector. Hair covering a fully in-frame pinna still looks like `CLEAR_HAIR`.
@@ -45,12 +45,12 @@ Head pose from MediaPipe is for **direction**. Ear-ROI sharpness/structure is ho
 
 1. Face in frame, distance OK  
 2. This side has a **bestYaw** (highest quality score in the search window)  
-3. Current yaw within **±5°** of that best; pitch/roll inside ready limits  
+3. Current yaw within **±5°** of that best (stays READY until **±8°**, `exitBandDeg`); pitch/roll inside ready limits  
 4. ~12 stable frames  
 5. Ear score ≥ **92%** of the side’s peak; brightness 60–200  
 6. No yaw ∈ [70, 90] requirement; no user confirm  
 
-Guidance is one short line (中文 / English in the app). Switching left/right resets shutter, dwell, and guidance and shows a body-side intro; the other side’s stored peak is kept. While the peak is still unknown we only ask the user to turn slowly (no “a little more / ease back” vs a prior angle). `SLOW_DOWN` can preempt a sweep line on a fast yaw jump, then yields back to SWEEP on a short window (`slowDownHoldMs`, same idea as READY’s `readyPromoteMs`) so 「转慢一点」 does not sit for a full yaw-family `minDwellMs`. Near a locked peak but not yet stable we do **not** say “hold still” while capture is still blocked. READY promotes faster so prompts do not feel like a checklist. After a shot, feedback is relative to the remembered peak (no absolute degrees), with retake / other ear. Absolute yaw/pitch/roll numbers stay behind a debug toggle.
+Guidance is one short line (中文 / English in the app). Switching left/right resets shutter, dwell, and guidance and shows a body-side intro; the other side’s stored peak is kept. While the peak is still unknown we only **sweep** (no prior-driven “a little more / ease back”). `SLOW_DOWN` can preempt a sweep line on a fast yaw jump, then yields back to SWEEP on a short window (`slowDownHoldMs`=200, same idea as READY’s `readyPromoteMs`) so 「转慢一点」 does not sit for a full yaw-family `minDwellMs`. After lock, going past `bestYaw` by `overshootPastBestDeg` with a score drop says ease back; returning toward best is HOLD, not MORE. Near a locked peak but not yet stable the shutter stays grey and uses **NEAR_PEAK** (「快到了…」), never **HOLD_STILL**. READY hysteresis: enter ±5° / leave ±8°. Auto-shutter is a cancelable `autoshutterMs` countdown after Ready. After a shot, feedback is relative to the remembered peak (no absolute degrees), with retake / other ear. Absolute yaw/pitch/roll numbers stay behind a debug toggle.
 
 ## Leftover cannot-do (this pass)
 

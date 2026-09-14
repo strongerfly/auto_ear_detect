@@ -31,7 +31,8 @@
     "allowResweepOnce": true,
     "tieBreak": "smallerAbsYaw",
     "guidanceCoarseAbsError": 22,
-    "slowYawDeltaDeg": 18
+    "slowYawDeltaDeg": 18,
+    "overshootPastBestDeg": 8
   },
   "score": {
     "weights": { "sharp": 0.45, "struct": 0.35, "content": 0.20 },
@@ -51,6 +52,7 @@
   },
   "ready": {
     "bandDegAroundBest": 5,
+    "exitBandDeg": 8,
     "scoreRatioOfBest": 0.92,
     "stableFrames": 12,
     "maxDeltaYawDeg": 3,
@@ -59,7 +61,7 @@
     "brightnessMin": 60,
     "brightnessMax": 200,
     "burstFrames": 3,
-    "autoShutterCountdownMs": 3000,
+    "autoshutterMs": 3000,
     "pickBurstBy": "score",
     "requireUserConfirm": false,
     "pitchMaxAbs": 10,
