@@ -43,6 +43,7 @@ export function loadPersonalBests(): PersonalBestMap {
 
 export function savePersonalBests(bests: PersonalBestMap): void {
   if (typeof localStorage === "undefined") return;
+  if (!poseConfig.personalBest.persist) return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(bests));
 }
 
@@ -52,10 +53,7 @@ export function yawInSearchWindow(
   config: PoseConfig = poseConfig,
 ): boolean {
   const abs = Math.abs(yaw);
-  if (
-    abs < config.personalBest.searchYawMinAbs ||
-    abs > config.personalBest.searchYawMaxAbs
-  ) {
+  if (abs < config.search.yawAbsMin || abs > config.search.yawAbsMax) {
     return false;
   }
   return side === "rightEar" ? yaw > 0 : yaw < 0;
@@ -69,10 +67,24 @@ export type BestYawSample = {
   side: EarSide;
 };
 
+function poseOkForBest(
+  pitch: number,
+  roll: number,
+  config: PoseConfig,
+): boolean {
+  if (!config.score.updateBestOnlyIfPoseOk) return true;
+  return (
+    pitch >= config.search.pitchMin &&
+    pitch <= config.search.pitchMax &&
+    roll >= config.search.rollMin &&
+    roll <= config.search.rollMax
+  );
+}
+
 /**
  * Running max: bestYaw is the yaw at the highest frontal-quality score seen
- * in the per-side search window. Pitch/roll outliers are ignored so a tilted
- * frame cannot steal the peak.
+ * in the per-side search window. Near-ties prefer the smaller |yaw|
+ * (a 45° peak wins over an equally sharp 80°). Pitch/roll outliers ignored.
  */
 export function updatePersonalBest(
   current: PeakSample | null,
@@ -81,26 +93,39 @@ export function updatePersonalBest(
 ): PeakSample | null {
   const { yaw, pitch, roll, quality, side } = sample;
   if (!yawInSearchWindow(yaw, side, config)) return current;
-  if (Math.abs(roll) > config.poseGuidance.rollCorrectAbove) return current;
-  if (pitch > config.poseGuidance.pitchTooHighAbove) return current;
-  if (pitch < config.poseGuidance.pitchTooLowBelow) return current;
+  if (!poseOkForBest(pitch, roll, config)) return current;
 
-  const score = frontalQualityScore(quality);
+  const score = frontalQualityScore(quality, yaw, config);
+  if (score < config.score.scoreMinAbsolute) return current;
+
   const minImprove = config.personalBest.minScoreImprove;
-  if (!current || score > current.score + minImprove) {
+  if (!current) return { yaw, score };
+
+  if (score > current.score + minImprove) {
     return { yaw, score };
   }
+
+  const nearTie = Math.abs(score - current.score) <= minImprove;
+  if (
+    nearTie &&
+    config.search.tieBreak === "smallerAbsYaw" &&
+    Math.abs(yaw) < Math.abs(current.yaw)
+  ) {
+    return { yaw, score: Math.max(score, current.score) };
+  }
+
   return current;
 }
 
-export function qualityCollapsing(
+export function qualityNearPeak(
   quality: EarQuality | null,
   peak: PeakSample | null,
+  yaw: number | undefined,
   config: PoseConfig = poseConfig,
 ): boolean {
   if (!quality || !peak || peak.score <= 0) return false;
   return (
-    frontalQualityScore(quality) <
-    peak.score * config.personalBest.qualityCollapseRatio
+    frontalQualityScore(quality, yaw, config) >=
+    peak.score * config.ready.scoreRatioOfBest
   );
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { poseConfig } from "../config";
 import { evaluateGuidance } from "./guidance";
-import { dwellPrompt, INITIAL_DWELL } from "./dwell";
+import { dwellMsFor, dwellPrompt, INITIAL_DWELL } from "./dwell";
 import { effectiveTargets } from "./effective-targets";
 import {
   updatePersonalBest,
@@ -21,10 +21,8 @@ const sharp: EarQuality = {
   edgeEnergy: 40,
 };
 
-const sharpScore = frontalQualityScore(sharp);
-
 function peakAt(yaw: number, quality: EarQuality = sharp): PeakSample {
-  return { yaw, score: frontalQualityScore(quality) };
+  return { yaw, score: frontalQualityScore(quality, yaw) };
 }
 
 function base(over: Partial<GuidanceInput> = {}): GuidanceInput {
@@ -33,7 +31,7 @@ function base(over: Partial<GuidanceInput> = {}): GuidanceInput {
     facePresence: 0.9,
     trackingConfidence: 0.9,
     faceHeightRatio: 0.4,
-    yaw: 80,
+    yaw: 60,
     pitch: 0,
     roll: 0,
     quality: sharp,
@@ -59,9 +57,9 @@ describe("pickPrompt priority", () => {
     ).toBe("TOO_CLOSE");
   });
 
-  it("FIX_ROLL before pitch/yaw", () => {
+  it("severe roll interrupts even while far from yaw", () => {
     const r = evaluateGuidance(
-      base({ roll: 20, pitch: 20, yaw: 0 }),
+      base({ roll: 22, pitch: 20, yaw: 0 }),
       poseConfig,
       "rightEar",
       null,
@@ -70,41 +68,69 @@ describe("pickPrompt priority", () => {
     expect(r.prompt).toBe("FIX_ROLL");
   });
 
-  it("PITCH_DOWN / PITCH_UP", () => {
+  it("mild roll while far away does not preempt the sweep", () => {
     expect(
-      evaluateGuidance(base({ pitch: 15 }), poseConfig, "rightEar", null, 0).prompt,
+      evaluateGuidance(base({ roll: 14, yaw: 0 }), poseConfig, "rightEar", null, 0)
+        .prompt,
+    ).toBe("SWEEP_RIGHT_EAR");
+  });
+
+  it("PITCH_DOWN / PITCH_UP when already close on yaw", () => {
+    expect(
+      evaluateGuidance(base({ pitch: 15, yaw: 60 }), poseConfig, "rightEar", null, 0)
+        .prompt,
     ).toBe("PITCH_DOWN");
     expect(
-      evaluateGuidance(base({ pitch: -15 }), poseConfig, "rightEar", null, 0).prompt,
+      evaluateGuidance(base({ pitch: -15, yaw: 60 }), poseConfig, "rightEar", null, 0)
+        .prompt,
     ).toBe("PITCH_UP");
   });
 
-  it("right-ear turn hints vs prior ~80° before a personal peak exists", () => {
+  it("right-ear sweep / more / back vs the soft prior", () => {
     expect(
       evaluateGuidance(base({ yaw: 20 }), poseConfig, "rightEar", null, 0).prompt,
-    ).toBe("TURN_LEFT");
+    ).toBe("SWEEP_RIGHT_EAR");
     expect(
-      evaluateGuidance(base({ yaw: 60 }), poseConfig, "rightEar", null, 0).prompt,
-    ).toBe("TURN_LEFT_MORE");
+      evaluateGuidance(base({ yaw: 45 }), poseConfig, "rightEar", null, 0).prompt,
+    ).toBe("TURN_MORE");
     expect(
-      evaluateGuidance(base({ yaw: 100 }), poseConfig, "rightEar", null, 0).prompt,
-    ).toBe("TURN_LEFT_BACK");
+      evaluateGuidance(base({ yaw: 90 }), poseConfig, "rightEar", null, 0).prompt,
+    ).toBe("TURN_BACK");
   });
 
-  it("left-ear turn hints (mirrored) vs prior ~−80°", () => {
+  it("left-ear sweep (mirrored) vs the soft prior", () => {
     expect(
       evaluateGuidance(base({ yaw: -20 }), poseConfig, "leftEar", null, 0).prompt,
-    ).toBe("TURN_RIGHT");
+    ).toBe("SWEEP_LEFT_EAR");
     expect(
-      evaluateGuidance(base({ yaw: -60 }), poseConfig, "leftEar", null, 0).prompt,
-    ).toBe("TURN_RIGHT_MORE");
+      evaluateGuidance(base({ yaw: -45 }), poseConfig, "leftEar", null, 0).prompt,
+    ).toBe("TURN_MORE");
     expect(
-      evaluateGuidance(base({ yaw: -100 }), poseConfig, "leftEar", null, 0).prompt,
-    ).toBe("TURN_RIGHT_BACK");
+      evaluateGuidance(base({ yaw: -90 }), poseConfig, "leftEar", null, 0).prompt,
+    ).toBe("TURN_BACK");
   });
 
-  it("CLEAR_HAIR then BAD_LIGHT while near the personal peak", () => {
-    const best = peakAt(80);
+  it("WRONG_SIDE if turning the opposite way", () => {
+    expect(
+      evaluateGuidance(base({ yaw: -20 }), poseConfig, "rightEar", null, 0).prompt,
+    ).toBe("WRONG_SIDE");
+  });
+
+  it("SLOW_DOWN when yaw jumps while still hunting", () => {
+    expect(
+      evaluateGuidance(
+        base({ yaw: 20 }),
+        poseConfig,
+        "rightEar",
+        null,
+        0,
+        { yawDelta: 20 },
+      ).prompt,
+    ).toBe("SLOW_DOWN");
+  });
+
+  it("CLEAR_HAIR then BAD_LIGHT only once near the personal peak", () => {
+    const best = peakAt(60);
     expect(
       evaluateGuidance(
         base({ quality: { laplacian: 10, brightness: 120, edgeEnergy: 40 } }),
@@ -125,8 +151,24 @@ describe("pickPrompt priority", () => {
     ).toBe("BAD_LIGHT");
   });
 
-  it("HOLD_STILL until stable frames, then READY near a locked 80° peak", () => {
-    const best = peakAt(80);
+  it("does not nag hair while still far from the peak", () => {
+    const best = peakAt(45);
+    expect(
+      evaluateGuidance(
+        base({
+          yaw: 15,
+          quality: { laplacian: 10, brightness: 120, edgeEnergy: 4 },
+        }),
+        poseConfig,
+        "rightEar",
+        best,
+        0,
+      ).prompt,
+    ).toBe("SWEEP_RIGHT_EAR");
+  });
+
+  it("HOLD_STILL until stable frames, then READY near a locked peak", () => {
+    const best = peakAt(60);
     const hold = evaluateGuidance(base(), poseConfig, "rightEar", best, 3);
     expect(hold.prompt).toBe("HOLD_STILL");
     expect(hold.allowCapture).toBe(false);
@@ -138,15 +180,17 @@ describe("pickPrompt priority", () => {
   it("left/right modes change copy at the same physical yaw=0", () => {
     const left = evaluateGuidance(base({ yaw: 0 }), poseConfig, "leftEar", null, 0);
     const right = evaluateGuidance(base({ yaw: 0 }), poseConfig, "rightEar", null, 0);
-    expect(left.prompt).toBe("TURN_RIGHT");
-    expect(right.prompt).toBe("TURN_LEFT");
+    expect(left.prompt).toBe("SWEEP_LEFT_EAR");
+    expect(right.prompt).toBe("SWEEP_RIGHT_EAR");
   });
 });
 
 describe("quality-driven personal best yaw", () => {
-  it("search window includes 45° and excludes near-frontal", () => {
+  it("search window is |yaw| 35–90 and excludes near-frontal", () => {
     expect(yawInSearchWindow(45, "rightEar")).toBe(true);
     expect(yawInSearchWindow(35, "rightEar")).toBe(true);
+    expect(yawInSearchWindow(90, "rightEar")).toBe(true);
+    expect(yawInSearchWindow(95, "rightEar")).toBe(false);
     expect(yawInSearchWindow(20, "rightEar")).toBe(false);
     expect(yawInSearchWindow(-45, "rightEar")).toBe(false);
     expect(yawInSearchWindow(-45, "leftEar")).toBe(true);
@@ -172,10 +216,28 @@ describe("quality-driven personal best yaw", () => {
     }
     expect(best).not.toBeNull();
     expect(best!.yaw).toBe(45);
-    expect(best!.score).toBeGreaterThan(frontalQualityScore(samples[0][1]));
   });
 
-  it("ignores a higher score when pitch/roll are out of guidance range", () => {
+  it("near-tie prefers the smaller |yaw| (45° over 80°)", () => {
+    const even: EarQuality = { laplacian: 160, brightness: 120, edgeEnergy: 40 };
+    let best = updatePersonalBest(null, {
+      yaw: 80,
+      pitch: 0,
+      roll: 0,
+      quality: even,
+      side: "rightEar",
+    });
+    best = updatePersonalBest(best, {
+      yaw: 45,
+      pitch: 0,
+      roll: 0,
+      quality: even,
+      side: "rightEar",
+    });
+    expect(best?.yaw).toBe(45);
+  });
+
+  it("ignores a higher score when pitch/roll are out of search range", () => {
     const first = updatePersonalBest(null, {
       yaw: 50,
       pitch: 0,
@@ -204,17 +266,17 @@ describe("quality-driven personal best yaw", () => {
     );
     expect(r.targets.locked).toBe(true);
     expect(r.targets.bestYaw).toBe(45);
+    expect(Math.abs(45 - 80)).toBeGreaterThan(5);
     expect(r.prompt).toBe("READY");
     expect(r.allowCapture).toBe(true);
     expect(r.poseReady).toBe(true);
   });
 
-  it("fixed 70–90 band alone is not sufficient for READY", () => {
+  it("yaw at 80 with ok quality is not READY without a locked personal best", () => {
     const r = evaluateGuidance(base({ yaw: 80 }), poseConfig, "rightEar", null, 12);
     expect(r.allowCapture).toBe(false);
     expect(r.prompt).not.toBe("READY");
     expect(r.poseReady).toBe(false);
-    expect(r.prompt).toBe("HOLD_STILL");
   });
 
   it("yaw=80 is not READY when the personal peak is 45°", () => {
@@ -227,20 +289,20 @@ describe("quality-driven personal best yaw", () => {
       12,
     );
     expect(r.allowCapture).toBe(false);
-    expect(r.prompt).toBe("TURN_LEFT_BACK");
+    expect(r.prompt).toBe("TURN_BACK");
   });
 
-  it("guides toward the personal best, not the 80° prior", () => {
+  it("guides toward the personal best, not a 70–90 band", () => {
     const best = peakAt(45);
     expect(
       evaluateGuidance(base({ yaw: 15 }), poseConfig, "rightEar", best, 0).prompt,
-    ).toBe("TURN_LEFT");
+    ).toBe("SWEEP_RIGHT_EAR");
     expect(
       evaluateGuidance(base({ yaw: 28 }), poseConfig, "rightEar", best, 0).prompt,
-    ).toBe("TURN_LEFT_MORE");
+    ).toBe("TURN_MORE");
     expect(
       evaluateGuidance(base({ yaw: 70 }), poseConfig, "rightEar", best, 0).prompt,
-    ).toBe("TURN_LEFT_BACK");
+    ).toBe("TURN_BACK");
   });
 
   it("synthetic path peaking at 45° becomes READY after returning to the peak", () => {
@@ -301,12 +363,9 @@ describe("quality-driven personal best yaw", () => {
     expect(r.prompt).toBe("READY");
   });
 
-  it("collapsing quality near the peak is not READY", () => {
-    const best = { yaw: 45, score: sharpScore };
-    const weak = { laplacian: 110, brightness: 120, edgeEnergy: 16 };
-    expect(frontalQualityScore(weak)).toBeLessThan(
-      sharpScore * poseConfig.personalBest.qualityCollapseRatio,
-    );
+  it("score must stay near the personal peak to READY", () => {
+    const best = peakAt(45);
+    const weak = { laplacian: 90, brightness: 120, edgeEnergy: 16 };
     const r = evaluateGuidance(
       base({ yaw: 45, quality: weak }),
       poseConfig,
@@ -318,9 +377,22 @@ describe("quality-driven personal best yaw", () => {
     expect(r.prompt).not.toBe("READY");
   });
 
-  it("prior center stays ~80 until a peak is locked; 45 is not clamped away", () => {
+  it("±5° ready band: 51° is too far from a 45° peak", () => {
+    const best = peakAt(45);
+    const r = evaluateGuidance(
+      base({ yaw: 51, quality: sharp }),
+      poseConfig,
+      "rightEar",
+      best,
+      12,
+    );
+    expect(r.allowCapture).toBe(false);
+    expect(r.poseReady).toBe(false);
+  });
+
+  it("prior is a soft center until a peak is locked; 45 is not refused", () => {
     const prior = effectiveTargets("rightEar", null, poseConfig);
-    expect(prior.yawCenter).toBe(80);
+    expect(prior.yawCenter).toBe(poseConfig.search.priorYawAbs);
     expect(prior.locked).toBe(false);
     const personal = effectiveTargets("rightEar", peakAt(45), poseConfig);
     expect(personal.yawCenter).toBe(45);
@@ -332,9 +404,16 @@ describe("prompt dwell", () => {
   it("shows first prompt immediately, then waits 400ms", () => {
     const a = dwellPrompt(INITIAL_DWELL, "NO_FACE", 0, 400);
     expect(a.displayed).toBe("NO_FACE");
-    const b = dwellPrompt(a, "TURN_LEFT", 100, 400);
+    const b = dwellPrompt(a, "SWEEP_RIGHT_EAR", 100, 400);
     expect(b.displayed).toBe("NO_FACE");
-    const c = dwellPrompt(b, "TURN_LEFT", 500, 400);
-    expect(c.displayed).toBe("TURN_LEFT");
+    const c = dwellPrompt(b, "SWEEP_RIGHT_EAR", 500, 400);
+    expect(c.displayed).toBe("SWEEP_RIGHT_EAR");
+  });
+
+  it("promotes READY faster than cross-family switches", () => {
+    const ux = poseConfig.promptUx;
+    expect(dwellMsFor("TURN_MORE", "READY", ux)).toBe(ux.readyPromoteMs);
+    expect(dwellMsFor("TURN_MORE", "TURN_BACK", ux)).toBe(ux.minDwellMs);
+    expect(dwellMsFor("NO_FACE", "TURN_MORE", ux)).toBe(ux.crossFamilyDwellMs);
   });
 });

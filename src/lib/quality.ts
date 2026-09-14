@@ -1,3 +1,5 @@
+import type { PoseConfig } from "../config";
+import { poseConfig } from "../config";
 import type { EarQuality } from "./types";
 
 function variance(values: Float64Array | number[]): number {
@@ -27,6 +29,19 @@ export type ImageDataLike = {
   height: number;
 };
 
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+export function unitInterval(
+  value: number,
+  min: number,
+  good: number,
+): number {
+  if (good <= min) return value >= good ? 1 : 0;
+  return clamp01((value - min) / (good - min));
+}
+
 /**
  * Sharpness / exposure metrics on an RGBA ImageData crop.
  * Laplacian variance ≈ focus; Sobel mean ≈ edge energy; mean luma ≈ brightness.
@@ -42,8 +57,22 @@ export function measureEarQuality(image: ImageDataLike): EarQuality {
   }
   const brightness = lumaSum / (w * h);
 
+  const x0 = Math.floor(w * 0.35);
+  const x1 = Math.max(x0 + 1, Math.ceil(w * 0.65));
+  const y0 = Math.floor(h * 0.35);
+  const y1 = Math.max(y0 + 1, Math.ceil(h * 0.65));
+  let centerSum = 0;
+  let centerN = 0;
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      centerSum += gray[y * w + x];
+      centerN += 1;
+    }
+  }
+  const centerBrightness = centerN === 0 ? brightness : centerSum / centerN;
+
   if (w < 3 || h < 3) {
-    return { laplacian: 0, brightness, edgeEnergy: 0 };
+    return { laplacian: 0, brightness, edgeEnergy: 0, centerBrightness };
   }
 
   const lap: number[] = [];
@@ -79,17 +108,60 @@ export function measureEarQuality(image: ImageDataLike): EarQuality {
     laplacian: variance(lap),
     brightness,
     edgeEnergy: edgeN === 0 ? 0 : edgeSum / edgeN,
+    centerBrightness,
   };
 }
 
 /**
- * Rank how frontal / ear-like an ROI looks. Laplacian variance is the
- * focus/detail cue (helix folds); Sobel mean rewards visible contours vs a
- * smooth cheek or hair blob. No extra symmetry term: left/right ROI energy
- * is unstable under yaw and hair.
+ * 0–1 ear-frontal score: sharpness (Laplacian) + structure (edges) + a light
+ * content prior (side-face yaw, preferred 40–80 band, dark-center penalty).
+ * Preferred-band miss is a soft penalty, never a refusal of ~45°.
  */
-export function frontalQualityScore(quality: EarQuality): number {
-  return quality.laplacian + 0.5 * quality.edgeEnergy;
+export function frontalQualityScore(
+  quality: EarQuality,
+  yaw?: number,
+  config: PoseConfig = poseConfig,
+): number {
+  const s = config.score;
+  const sharp = unitInterval(
+    quality.laplacian,
+    s.sharp.laplacianMinRaw,
+    s.sharp.laplacianGoodRaw,
+  );
+  const struct = unitInterval(
+    quality.edgeEnergy,
+    s.struct.minEdgeEnergy,
+    s.struct.goodEdgeEnergy,
+  );
+
+  let content = 0.5;
+  if (yaw !== undefined) {
+    const abs = Math.abs(yaw);
+    const inSearch =
+      abs >= config.search.yawAbsMin && abs <= config.search.yawAbsMax;
+    content = s.content.requireSideFaceProxy && !inSearch ? 0 : 1;
+    if (
+      inSearch &&
+      (abs < config.search.preferredAbsMin ||
+        abs > config.search.preferredAbsMax)
+    ) {
+      content = Math.max(0, content - s.content.outsidePreferredSoftPenalty);
+    }
+  }
+  if (
+    s.content.penalizeMeatusLikeDarkBlob &&
+    quality.centerBrightness !== undefined &&
+    quality.centerBrightness < s.content.meatusCenterBrightnessBelow &&
+    quality.brightness > config.ready.brightnessMin
+  ) {
+    content = Math.max(0, content - s.content.meatusPenalty);
+  }
+
+  return (
+    s.weights.sharp * sharp +
+    s.weights.struct * struct +
+    s.weights.content * content
+  );
 }
 
 /** Synthetic quality vs yaw (tests + pose simulator). Peak at `peakYaw`. */
@@ -105,6 +177,7 @@ export function qualityAlongYawCurve(
     laplacian: peak.laplacian * scale,
     brightness: peak.brightness,
     edgeEnergy: peak.edgeEnergy * scale,
+    centerBrightness: peak.centerBrightness,
   };
 }
 
@@ -112,23 +185,18 @@ export type QualityKind = "ok" | "hair" | "light";
 
 export function classifyEarQuality(
   quality: EarQuality | null,
-  thresholds: {
-    laplacianMin: number;
-    brightnessMin: number;
-    brightnessMax: number;
-    minEdgeEnergy: number;
-  },
+  config: PoseConfig = poseConfig,
 ): QualityKind {
   if (!quality) return "hair";
   if (
-    quality.laplacian < thresholds.laplacianMin ||
-    quality.edgeEnergy < thresholds.minEdgeEnergy
+    quality.laplacian < config.score.sharp.laplacianMinRaw ||
+    quality.edgeEnergy < config.score.struct.minEdgeEnergy
   ) {
     return "hair";
   }
   if (
-    quality.brightness < thresholds.brightnessMin ||
-    quality.brightness > thresholds.brightnessMax
+    quality.brightness < config.ready.brightnessMin ||
+    quality.brightness > config.ready.brightnessMax
   ) {
     return "light";
   }

@@ -78,6 +78,7 @@ export function EarCaptureApp() {
   const stableFrames = useRef(0);
   const lastVideoTime = useRef(-1);
   const smootherRef = useRef<EulerSmoother | null>(null);
+  const readyBurst = useRef(0);
 
   sideRef.current = side;
   bestsRef.current = bests;
@@ -271,6 +272,10 @@ export function EarCaptureApp() {
       } else {
         stableFrames.current = 0;
       }
+      const yawDelta =
+        lastAngles.current && angles
+          ? Math.abs(angles.yaw - lastAngles.current.yaw)
+          : 0;
       lastAngles.current = angles;
 
       if (hasFace && angles && quality) {
@@ -305,17 +310,29 @@ export function EarCaptureApp() {
         currentSide,
         bestsRef.current[currentSide],
         stableFrames.current,
+        { yawDelta },
       );
 
       dwellRef.current = dwellPrompt(
         dwellRef.current,
         guidance.prompt,
         now,
-        poseConfig.promptUx.minDwellMs,
+        poseConfig.promptUx,
       );
       const shown = dwellRef.current.displayed ?? guidance.prompt;
 
-      if (guidance.allowCapture && autoShutterRef.current && !shutterLatch.current) {
+      if (guidance.allowCapture) {
+        readyBurst.current += 1;
+      } else {
+        readyBurst.current = 0;
+      }
+
+      if (
+        guidance.allowCapture &&
+        autoShutterRef.current &&
+        !shutterLatch.current &&
+        readyBurst.current >= poseConfig.ready.burstFrames
+      ) {
         shutterLatch.current = true;
         captureStillRef.current();
       }
@@ -414,7 +431,6 @@ export function EarCaptureApp() {
         pitch={live.pitch}
         roll={live.roll}
         bestYaw={personalBest}
-        prompt={live.prompt}
       />
 
       <div className="dock">
@@ -453,19 +469,12 @@ export function EarCaptureApp() {
       <div className="dock">
         <span className="calib-note">
           {personalBest
-            ? `此侧最佳角度 ${personalBest.yaw.toFixed(1)}°（转头时自动学习）`
-            : "请慢慢转头，系统会记住此侧耳区最清晰的角度"}
+            ? `已记住此侧最清晰角度 ${personalBest.yaw.toFixed(0)}°`
+            : "慢慢转头即可，系统会自己找最清晰的角度"}
         </span>
         <button type="button" className="ghost" onClick={recalibrateSide}>
-          重新学习此侧
+          重新学习
         </button>
-        {live.quality ? (
-          <span className="calib-note">
-            耳区 Laplacian {live.quality.laplacian.toFixed(0)} · 亮度{" "}
-            {live.quality.brightness.toFixed(0)} · 边缘{" "}
-            {live.quality.edgeEnergy.toFixed(0)}
-          </span>
-        ) : null}
       </div>
 
       {lastCapture ? (
@@ -479,9 +488,8 @@ export function EarCaptureApp() {
 
       <footer className="foot">
         <p>
-          FISWG：+yaw 露右耳，−yaw 露左耳。Euler 顺序 YXZ。拍摄目标按耳区清晰度自动学习（约
-          35°–100°），不固定 70–90。阈值见{" "}
-          <code>src/config/pose-config.json</code>。
+          FISWG：+yaw 露右耳，−yaw 露左耳。目标按耳区清晰度自动学习（约 35°–90°），不固定
+          70–90。说明见 <code>docs/LIMITS.zh-CN.md</code>。
         </p>
       </footer>
     </div>
