@@ -169,6 +169,17 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
+.hud summary {
+  cursor: pointer;
+  color: var(--muted);
+  list-style: none;
+  width: 100%;
+}
+
+.hud[open] summary {
+  margin-bottom: 8px;
+}
+
 .hud strong {
   color: var(--ink);
   font-weight: 650;

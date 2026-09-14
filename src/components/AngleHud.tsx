@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { PeakSample } from "../lib/personal-best";
 
 export function AngleHud({
@@ -11,10 +12,16 @@ export function AngleHud({
   roll: number | null;
   bestYaw: PeakSample | null;
 }) {
+  const [open, setOpen] = useState(false);
   const fmt = (v: number | null) =>
     v === null || Number.isNaN(v) ? "—" : v.toFixed(1);
   return (
-    <div className="hud" aria-live="polite">
+    <details
+      className="hud"
+      open={open}
+      onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}
+    >
+      <summary>调试角度（平时不用看）</summary>
       <span>
         yaw <strong>{fmt(yaw)}°</strong>
       </span>
@@ -25,8 +32,8 @@ export function AngleHud({
         roll <strong>{fmt(roll)}°</strong>
       </span>
       <span>
-        最佳 <strong>{bestYaw ? `${bestYaw.yaw.toFixed(0)}°` : "学习中"}</strong>
+        bestYaw <strong>{bestYaw ? `${bestYaw.yaw.toFixed(0)}°` : "—"}</strong>
       </span>
-    </div>
+    </details>
   );
 }

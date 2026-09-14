@@ -6,7 +6,18 @@ Real-time **head-pose guided ear capture**. MediaPipe Face Landmarker estimates 
 
 Stack: **Vite + React + TypeScript** + `@mediapipe/tasks-vision` Face Landmarker (`VIDEO` mode, `outputFacialTransformationMatrixes: true`).
 
-Limits, blockers, and what we will not pretend to solve: **[docs/LIMITS.md](docs/LIMITS.md)** · **[docs/LIMITS.zh-CN.md](docs/LIMITS.zh-CN.md)**.
+Limits, blockers, and what we will not pretend to solve: **[docs/LIMITS.md](docs/LIMITS.md)** · **[docs/LIMITS.zh-CN.md](docs/LIMITS.zh-CN.md)**. Interaction coverage: **[docs/ear-guide-interaction-gaps.md](docs/ear-guide-interaction-gaps.md)**.
+
+## 能实现的天花板 / Ceiling that ships
+
+- Per-side **quality peak yaw** while the user turns (\|yaw\| 35–90, soft preferred 40–80).
+- READY near that personal best (**±5°**, exit hysteresis 8°) with score ≥ 92% of peak and stable frames — including a **~45°** peak.
+- Progressive copy: sweep / 再转一点点 / 往回一点（过了个人峰值）. No 70–90 gate. No “confirm the ear is frontal”.
+- Unlocked (still learning): **only** sweep intro — no fake HOLD / TURN_BACK from a 60° prior.
+
+## 明确做不到的 / Explicitly not solved
+
+Hair/occlusion, score ≠ anatomical ear-normal, high-yaw tracker drop, laptop-specific blur numbers, medical meatus, camera E2E without a device. See LIMITS for 卡点 / 上限 / 短板 / 后续 / 条件. Do not treat those as done.
 
 ## Run
 
@@ -95,6 +106,7 @@ src/lib/personal-best.ts      running bestYaw from ROI quality
 src/lib/quality.ts            Laplacian / edges / weighted score
 docs/LIMITS.md                blockers, ceiling, next steps (EN)
 docs/LIMITS.zh-CN.md          卡点 / 上限 / 短板 / 后续
+docs/ear-guide-interaction-gaps.md  P0/P1 coverage checklist
 src/components/EarCaptureApp.tsx
 ```
 

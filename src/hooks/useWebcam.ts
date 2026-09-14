@@ -35,9 +35,11 @@ export function useWebcam() {
       await video.play();
       setReady(true);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "无法打开摄像头";
-      setError(message);
+      const denied =
+        typeof DOMException !== "undefined" &&
+        err instanceof DOMException &&
+        (err.name === "NotAllowedError" || err.name === "PermissionDeniedError");
+      setError(denied ? "permission-denied" : err instanceof Error ? err.message : "无法打开摄像头");
       setReady(false);
     }
   }, [stop]);

@@ -36,6 +36,7 @@ type LiveState = {
   roll: number | null;
   prompt: PromptKey;
   allowCapture: boolean;
+  phase: "learning" | "hold" | "ready";
   roi: RoiBox | null;
   quality: EarQuality | null;
   faceHeightRatio: number;
@@ -47,6 +48,7 @@ const INITIAL_LIVE: LiveState = {
   roll: null,
   prompt: "NO_FACE",
   allowCapture: false,
+  phase: "learning",
   roi: null,
   quality: null,
   faceHeightRatio: 0,
@@ -62,7 +64,7 @@ export function EarCaptureApp() {
 
   const [side, setSide] = useState<EarSide>("rightEar");
   const [bests, setBests] = useState<PersonalBestMap>(() => loadPersonalBests());
-  const [autoShutter, setAutoShutter] = useState(true);
+  const [autoShutter, setAutoShutter] = useState(false);
   const [lastCapture, setLastCapture] = useState<string | null>(null);
   const [sim, setSim] = useState<SimState>(DEFAULT_SIM);
   const [live, setLive] = useState<LiveState>(INITIAL_LIVE);
@@ -81,6 +83,8 @@ export function EarCaptureApp() {
   const readyBurst = useRef(0);
   const hadTrackedFace = useRef(false);
   const searchStartedAt = useRef<number | null>(null);
+  const wasPoseReady = useRef(false);
+  const shutterCancel = useRef(false);
 
   sideRef.current = side;
   bestsRef.current = bests;
@@ -138,7 +142,7 @@ export function EarCaptureApp() {
 
   useEffect(() => {
     if (!lmLoading && landmarker) {
-      setStatus("点击「打开摄像头」开始。前置预览已镜像，姿态按未翻转画面估计。");
+      setStatus(poseConfig.copy.MIRROR_HINT);
     } else if (lmError) {
       setStatus(`模型加载失败：${lmError}。仍可用姿态模拟器。`);
     }
@@ -329,6 +333,7 @@ export function EarCaptureApp() {
             searchStartedAt.current === null
               ? 0
               : now - searchStartedAt.current,
+          wasPoseReady: wasPoseReady.current,
         },
       );
 
@@ -340,16 +345,20 @@ export function EarCaptureApp() {
       );
       const shown = dwellRef.current.displayed ?? guidance.prompt;
 
+      wasPoseReady.current = guidance.poseReady;
+
       if (guidance.allowCapture) {
         readyBurst.current += 1;
       } else {
         readyBurst.current = 0;
+        shutterCancel.current = false;
       }
 
       if (
         guidance.allowCapture &&
         autoShutterRef.current &&
         !shutterLatch.current &&
+        !shutterCancel.current &&
         readyBurst.current >= poseConfig.ready.burstFrames
       ) {
         shutterLatch.current = true;
@@ -365,6 +374,7 @@ export function EarCaptureApp() {
         roll,
         prompt: shown,
         allowCapture: guidance.allowCapture,
+        phase: guidance.phase,
         roi,
         quality,
         faceHeightRatio: heightRatio,
@@ -376,11 +386,13 @@ export function EarCaptureApp() {
   }, [landmarker, videoRef]);
 
   const recalibrateSide = () => {
+    if (!window.confirm(poseConfig.copy.RELEARN_CONFIRM)) return;
     const next = { ...bests, [side]: null };
     bestsRef.current = next;
     setBests(next);
     savePersonalBests(next);
     searchStartedAt.current = null;
+    wasPoseReady.current = false;
   };
 
   const downloadCapture = () => {
@@ -394,9 +406,12 @@ export function EarCaptureApp() {
 
   const stageHint = useMemo(() => {
     if (sim.enabled) return "模拟模式";
+    if (camError === "permission-denied") {
+      return poseConfig.copy.CAMERA_DENIED;
+    }
     if (camError) return `摄像头：${camError}`;
     if (!camReady) return "摄像头未开启";
-    return "前置预览（CSS 镜像）· 推理用未翻转帧";
+    return poseConfig.copy.MIRROR_HINT;
   }, [camError, camReady, sim.enabled]);
 
   return (
@@ -464,6 +479,15 @@ export function EarCaptureApp() {
           type="button"
           className="capture"
           disabled={!live.allowCapture}
+          title={
+            live.allowCapture
+              ? poseConfig.copy.READY
+              : live.phase === "hold"
+                ? poseConfig.copy.HOLD_NEAR_PEAK
+                : poseConfig.copy[
+                    side === "rightEar" ? "SWEEP_RIGHT_EAR" : "SWEEP_LEFT_EAR"
+                  ]
+          }
           onClick={captureStill}
         >
           拍摄
@@ -472,10 +496,25 @@ export function EarCaptureApp() {
           <input
             type="checkbox"
             checked={autoShutter}
-            onChange={(e) => setAutoShutter(e.target.checked)}
+            onChange={(e) => {
+              setAutoShutter(e.target.checked);
+              shutterCancel.current = false;
+            }}
           />
-          自动快门
+          自动快门（默认关）
         </label>
+        {autoShutter && live.allowCapture ? (
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => {
+              shutterCancel.current = true;
+              setAutoShutter(false);
+            }}
+          >
+            {poseConfig.copy.AUTOSHUTTER_COUNTDOWN}
+          </button>
+        ) : null}
         <button
           type="button"
           className="ghost"
@@ -489,7 +528,7 @@ export function EarCaptureApp() {
       <div className="dock">
         <span className="calib-note">
           {personalBest
-            ? `${poseConfig.copy.SOFT_BEST} ${personalBest.yaw.toFixed(0)}°`
+            ? poseConfig.copy.SOFT_BEST
             : "慢慢转头即可，系统会自己找最清晰的角度"}
         </span>
         <button type="button" className="ghost" onClick={recalibrateSide}>
@@ -499,7 +538,9 @@ export function EarCaptureApp() {
 
       {lastCapture ? (
         <figure className="preview">
-          <figcaption>上次拍摄（未镜像，解剖左右）</figcaption>
+          <figcaption>
+            上次拍摄（未镜像，解剖左右）· {poseConfig.copy.OTHER_EAR_HINT}
+          </figcaption>
           <img src={lastCapture} alt="上次拍摄的耳部照片" />
         </figure>
       ) : null}
@@ -508,8 +549,8 @@ export function EarCaptureApp() {
 
       <footer className="foot">
         <p>
-          FISWG：+yaw 露右耳，−yaw 露左耳。目标按耳区清晰度自动学习（约 35°–90°），不固定
-          70–90。说明见 <code>docs/LIMITS.zh-CN.md</code>。
+          {poseConfig.copy.LIMITS_HINT} 详见{" "}
+          <code>docs/LIMITS.zh-CN.md</code>。
         </p>
       </footer>
     </div>

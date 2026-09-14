@@ -51,6 +51,7 @@
   },
   "ready": {
     "bandDegAroundBest": 5,
+    "exitBandDeg": 8,
     "scoreRatioOfBest": 0.92,
     "stableFrames": 12,
     "maxDeltaYawDeg": 3,
@@ -101,7 +102,7 @@
     "SWEEP_RIGHT_EAR": "请向左转头，慢慢找右耳最清楚的角度",
     "SWEEP_LEFT_EAR": "请向右转头，慢慢找左耳最清楚的角度",
     "TURN_MORE": "再转一点点",
-    "TURN_BACK": "转得有点过了，往回一点",
+    "TURN_BACK": "往回一点，刚才那边更清楚",
     "SLOW_DOWN": "请慢一点转",
     "CLEAR_HAIR": "请把耳边头发拨开",
     "BAD_LIGHT": "光线不太好，换亮一点的地方",
@@ -110,6 +111,12 @@
     "SOFT_BEST": "已选当前最清晰角度",
     "FAIL_TIMEOUT": "还没找到清晰角度，请拨开头发后再试一次",
     "FAIL_TRACKING": "脸跟丢了，请正对屏幕后重新转头",
-    "WRONG_SIDE": "方向反了，请按提示的方向转头"
+    "WRONG_SIDE": "方向反了：请按身体的左/右转，不是镜子",
+    "RELEARN_CONFIRM": "重新找这一侧最清楚的角度？当前记录会清掉。",
+    "CAMERA_DENIED": "没有摄像头权限。请在浏览器里允许后点「打开摄像头」。",
+    "MIRROR_HINT": "左右以你的身体为准，不是镜子。保存的照片与自拍预览左右相反。",
+    "OTHER_EAR_HINT": "这侧拍好了，需要的话再拍另一只耳朵。",
+    "AUTOSHUTTER_COUNTDOWN": "自动拍摄中，点按可取消",
+    "LIMITS_HINT": "会找你转头时最清楚的一帧，不是固定70–90度。"
   }
 }

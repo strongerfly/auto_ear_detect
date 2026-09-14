@@ -92,10 +92,10 @@ describe("pickPrompt priority", () => {
     ).toBe("SWEEP_RIGHT_EAR");
     expect(
       evaluateGuidance(base({ yaw: 45 }), poseConfig, "rightEar", null, 0).prompt,
-    ).toBe("TURN_MORE");
+    ).toBe("SWEEP_RIGHT_EAR");
     expect(
       evaluateGuidance(base({ yaw: 90 }), poseConfig, "rightEar", null, 0).prompt,
-    ).toBe("TURN_BACK");
+    ).toBe("SWEEP_RIGHT_EAR");
   });
 
   it("left-ear sweep (mirrored) vs the soft prior", () => {
@@ -104,10 +104,10 @@ describe("pickPrompt priority", () => {
     ).toBe("SWEEP_LEFT_EAR");
     expect(
       evaluateGuidance(base({ yaw: -45 }), poseConfig, "leftEar", null, 0).prompt,
-    ).toBe("TURN_MORE");
+    ).toBe("SWEEP_LEFT_EAR");
     expect(
       evaluateGuidance(base({ yaw: -90 }), poseConfig, "leftEar", null, 0).prompt,
-    ).toBe("TURN_BACK");
+    ).toBe("SWEEP_LEFT_EAR");
   });
 
   it("WRONG_SIDE if turning the opposite way", () => {
@@ -319,6 +319,9 @@ describe("quality-driven personal best yaw", () => {
     const r = evaluateGuidance(base({ yaw: 80 }), poseConfig, "rightEar", null, 12);
     expect(r.allowCapture).toBe(false);
     expect(r.prompt).not.toBe("READY");
+    expect(r.prompt).not.toBe("HOLD_NEAR_PEAK");
+    expect(r.prompt).toBe("SWEEP_RIGHT_EAR");
+    expect(r.phase).toBe("learning");
     expect(r.poseReady).toBe(false);
   });
 
@@ -420,17 +423,34 @@ describe("quality-driven personal best yaw", () => {
     expect(r.prompt).not.toBe("READY");
   });
 
-  it("±5° ready band: 51° is too far from a 45° peak", () => {
+  it("unlocked peak does not use the prior to TURN_BACK or TURN_MORE", () => {
+    expect(
+      evaluateGuidance(base({ yaw: 90 }), poseConfig, "rightEar", null, 0).prompt,
+    ).toBe("SWEEP_RIGHT_EAR");
+    expect(
+      evaluateGuidance(base({ yaw: 48 }), poseConfig, "rightEar", null, 0).prompt,
+    ).toBe("SWEEP_RIGHT_EAR");
+  });
+
+  it("exit-band hysteresis keeps READY a bit past ±5° once already ready", () => {
     const best = peakAt(45);
-    const r = evaluateGuidance(
-      base({ yaw: 51, quality: sharp }),
+    const entering = evaluateGuidance(
+      base({ yaw: 51 }),
       poseConfig,
       "rightEar",
       best,
       12,
     );
-    expect(r.allowCapture).toBe(false);
-    expect(r.poseReady).toBe(false);
+    expect(entering.poseReady).toBe(false);
+    const staying = evaluateGuidance(
+      base({ yaw: 51 }),
+      poseConfig,
+      "rightEar",
+      best,
+      12,
+      { wasPoseReady: true },
+    );
+    expect(staying.poseReady).toBe(true);
   });
 
   it("prior is a soft center until a peak is locked; 45 is not refused", () => {
