@@ -18,6 +18,8 @@ export type DwellUx = {
   readyPromoteMs?: number;
   /** Immediate switch from SWEEP/TURN_MORE onto SLOW_DOWN (QA: fast-turn hint). */
   slowDownPreemptMs?: number;
+  /** Keep SLOW_DOWN on screen after Δyaw settles, so a one-frame spike is readable. */
+  slowDownHoldMs?: number;
 };
 
 type Family =
@@ -87,6 +89,9 @@ export function dwellMsFor(
   // must surface SLOW_DOWN instead of leaving SWEEP pinned for minDwellMs.
   if (to === "SLOW_DOWN" && isKeepTurning(from)) {
     return ux.slowDownPreemptMs ?? 0;
+  }
+  if (from === "SLOW_DOWN" && isKeepTurning(to)) {
+    return ux.slowDownHoldMs ?? ux.minDwellMs;
   }
   if (to === "READY" || to === "SOFT_READY" || to === "STUCK_NO_PROGRESS") {
     return ux.readyPromoteMs ?? 200;

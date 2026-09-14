@@ -518,6 +518,10 @@ describe("prompt dwell", () => {
   it("promotes READY faster than cross-family switches", () => {
     const ux = poseConfig.promptUx;
     expect(dwellMsFor("TURN_MORE", "READY", ux)).toBe(ux.readyPromoteMs);
+    expect(dwellMsFor("TURN_MORE", "SOFT_READY", ux)).toBe(ux.readyPromoteMs);
+    expect(dwellMsFor("TURN_MORE", "STUCK_NO_PROGRESS", ux)).toBe(
+      ux.readyPromoteMs,
+    );
     expect(dwellMsFor("TURN_MORE", "TURN_BACK", ux)).toBe(ux.minDwellMs);
     expect(dwellMsFor("NO_FACE", "TURN_MORE", ux)).toBe(ux.crossFamilyDwellMs);
   });
@@ -536,7 +540,9 @@ describe("prompt dwell", () => {
       ux.minDwellMs,
     );
     expect(dwellMsFor("NEAR_PEAK", "SLOW_DOWN", ux)).toBe(ux.crossFamilyDwellMs);
-    expect(dwellMsFor("SLOW_DOWN", "SWEEP_RIGHT_EAR", ux)).toBe(ux.minDwellMs);
+    expect(dwellMsFor("SLOW_DOWN", "SWEEP_RIGHT_EAR", ux)).toBe(ux.slowDownHoldMs);
+    expect(dwellMsFor("SLOW_DOWN", "TURN_MORE", ux)).toBe(ux.slowDownHoldMs);
+    expect(dwellMsFor("SLOW_DOWN", "TURN_BACK", ux)).toBe(ux.minDwellMs);
   });
 
   it("large per-frame Δyaw surfaces SLOW_DOWN despite active SWEEP dwell", () => {
@@ -575,5 +581,11 @@ describe("prompt dwell", () => {
     dwell = dwellPrompt(dwell, settled.prompt, 250, ux);
     expect(dwell.displayed).toBe("SLOW_DOWN");
     expect(settled.allowCapture).toBe(false);
+
+    const holdUntil = 250 + ux.slowDownHoldMs;
+    dwell = dwellPrompt(dwell, settled.prompt, holdUntil - 1, ux);
+    expect(dwell.displayed).toBe("SLOW_DOWN");
+    dwell = dwellPrompt(dwell, settled.prompt, holdUntil, ux);
+    expect(dwell.displayed).toBe("SWEEP_RIGHT_EAR");
   });
 });
