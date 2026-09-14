@@ -6,45 +6,54 @@ export type EffectiveTargets = {
   locked: boolean;
   bestYaw: number | null;
   peakScore: number | null;
+  /** Guidance/ready center. Meaningful only when `locked`. */
   yawCenter: number;
   yawMin: number;
   yawMax: number;
+  yawExitMin: number;
+  yawExitMax: number;
   pitchMin: number;
   pitchMax: number;
   rollMin: number;
   rollMax: number;
   coarseAbsError: number;
   fineAbsError: number;
+  overshootPastBestDeg: number;
+  exitBandDeg: number;
 };
 
 /**
- * Guidance center is the personal best yaw when one has been observed,
- * otherwise the soft prior (search.priorYawAbs). Ready gating uses `locked`
- * so the prior band alone cannot fire capture.
+ * When a personal peak is locked, guidance and READY center on that yaw.
+ * While unlocked the soft prior is **not** a turn target — callers must keep
+ * the sweep intro until `locked`. Ready gating still requires `locked`.
  */
 export function effectiveTargets(
   side: EarSide,
   best: PeakSample | null,
   config: PoseConfig,
 ): EffectiveTargets {
-  const prior =
-    side === "rightEar" ? config.search.priorYawAbs : -config.search.priorYawAbs;
-  const readyErr = config.ready.bandDegAroundBest;
-  const yawCenter = best ? best.yaw : prior;
+  const enter = config.ready.bandDegAroundBest;
+  const exit = Math.max(enter, config.ready.exitBandDeg);
+  const overshoot = config.ready.overshootPastBestDeg;
+  const yawCenter = best ? best.yaw : 0;
   return {
     side,
     locked: best !== null,
     bestYaw: best?.yaw ?? null,
     peakScore: best?.score ?? null,
     yawCenter,
-    yawMin: yawCenter - readyErr,
-    yawMax: yawCenter + readyErr,
+    yawMin: yawCenter - enter,
+    yawMax: yawCenter + enter,
+    yawExitMin: yawCenter - exit,
+    yawExitMax: yawCenter + exit,
     pitchMin: -config.ready.pitchMaxAbs,
     pitchMax: config.ready.pitchMaxAbs,
     rollMin: -config.ready.rollMaxAbs,
     rollMax: config.ready.rollMaxAbs,
     coarseAbsError: config.search.guidanceCoarseAbsError,
-    fineAbsError: readyErr,
+    fineAbsError: enter,
+    overshootPastBestDeg: overshoot,
+    exitBandDeg: exit,
   };
 }
 
@@ -53,10 +62,14 @@ export function inNearBand(
   pitch: number,
   roll: number,
   t: EffectiveTargets,
+  wasInside = false,
 ): boolean {
+  if (!t.locked) return false;
+  const min = wasInside ? t.yawExitMin : t.yawMin;
+  const max = wasInside ? t.yawExitMax : t.yawMax;
   return (
-    yaw >= t.yawMin &&
-    yaw <= t.yawMax &&
+    yaw >= min &&
+    yaw <= max &&
     pitch >= t.pitchMin &&
     pitch <= t.pitchMax &&
     roll >= t.rollMin &&
@@ -70,10 +83,14 @@ export function inReadyBand(
   roll: number,
   t: EffectiveTargets,
   config: PoseConfig,
+  wasInside = false,
 ): boolean {
   if (!t.locked || t.bestYaw === null) return false;
+  const band = wasInside
+    ? t.exitBandDeg
+    : config.ready.bandDegAroundBest;
   return (
-    Math.abs(yaw - t.bestYaw) <= config.ready.bandDegAroundBest &&
+    Math.abs(yaw - t.bestYaw) <= band &&
     Math.abs(pitch) <= config.ready.pitchMaxAbs &&
     Math.abs(roll) <= config.ready.rollMaxAbs
   );

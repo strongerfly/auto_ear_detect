@@ -10,16 +10,16 @@
 
 页头切换 **中文 / English**。偏好保存在 `localStorage`（`auto-ear-detect:locale:v1`）。默认：浏览器语言 `zh*` 用中文，否则英文。
 
-上限与短板：**[docs/LIMITS.zh-CN.md](docs/LIMITS.zh-CN.md)** · **[docs/LIMITS.md](docs/LIMITS.md)**。
+上限与短板：**[docs/LIMITS.zh-CN.md](docs/LIMITS.zh-CN.md)** · **[docs/LIMITS.md](docs/LIMITS.md)**。交互 P0 与剩余缺口：**[docs/interaction-gaps.zh-CN.md](docs/interaction-gaps.zh-CN.md)**。
 
 ## 怎么用
 
 1. 允许摄像头。需要的话在页头切语言。
 2. 点 **拍左耳** 或 **拍右耳**（身体的左右，不是镜子）。拍右耳 → 向左转；拍左耳 → 向右转。
 3. **转头**慢慢转（不是转电脑/手机），找到耳朵最清楚的角度。第一次要慢慢转过，系统才会记住这一侧；在此之前拍不了。
-4. 等到 **可以拍了**。默认开着自动快门，到点会自己拍。然后点另一侧重转。
+4. 等到 **可以拍了**。自动快门第一次默认关上；打开后会倒数，可以取消。然后点另一侧重转。
 
-角度记错时用 **重新学习此侧**，再慢慢转一次。应用里的 **使用说明** 还有转过头、摄像头权限和做不到什么。
+角度记错时用 **重新学习此侧**，确认后再慢慢转一次。应用里的 **使用说明** 还有转过头、摄像头权限和做不到什么。普通界面不显示绝对角度，数字在 **调试：角度数字**。
 
 ## 运行
 
@@ -72,11 +72,11 @@ Euler 顺序为 **YXZ**（内旋 `R = Ry · Rx · Rz`），单位为**度**。4�
 
 1. 检测到人脸，尺寸在 `[minFaceHeightRatio, maxFaceHeightRatio]` 内
 2. 这一侧已经有 **bestYaw**
-3. 当前 yaw 在最佳附近 **±5°**，pitch/roll 在限内
+3. 当前 yaw 进入最佳附近 **±5°**，离开要到 **±8°**；pitch/roll 在限内
 4. 大约稳定 **12** 帧
 5. 分数 ≥ 该侧峰值的 **92%**，亮度在范围内
 
-没有「请确认耳朵已经正了」这一步。自动快门等 3 帧就绪再拍。**重新学习此侧**会清掉记住的峰值；学习本身是自动的。
+峰值锁定前只介绍怎么转（不会按万能角度喊往回或保持）。锁定后，过了 `bestYaw` 且分数掉了才请你往回；往回走时是保持。没有「请确认耳朵已经正了」这一步。自动快门第一次默认关；打开后等 3 帧按分数选最好，再倒数（`autoshutterMs`），可取消。**重新学习此侧** 会先确认，然后回到扫转介绍。
 
 ## 调参
 
@@ -85,7 +85,9 @@ Euler 顺序为 **YXZ**（内旋 `R = Ry · Rx · Rz`），单位为**度**。4�
 | 想要… | 改这里 |
 |--------|--------|
 | 搜索 / 偏好带 | `search.yawAbsMin` / `yawAbsMax` / `preferredAbs*` |
-| 就绪 vs 个人峰值 | `ready.bandDegAroundBest`、`ready.scoreRatioOfBest` |
+| 就绪 vs 个人峰值 | `ready.bandDegAroundBest`、`ready.exitBandDeg`、`ready.scoreRatioOfBest` |
+| 过冲 | `ready.overshootPastBestDeg` |
+| 自动快门倒数 | `ready.autoshutterMs`、`ready.burstFrames` |
 | 减少闪烁 | `promptUx.minDwellMs`、`crossFamilyDwellMs`、`smoothing.oneEuro` |
 | 清晰度下限 | `score.sharp`、`score.struct` |
 | 文案 | `src/i18n/messages.ts` |
@@ -99,8 +101,9 @@ src/lib/euler.ts              矩阵 → YXZ → FISWG 符号
 src/lib/guidance.ts           渐进提示 + 就绪门控
 src/lib/personal-best.ts      按耳区质量更新 bestYaw
 src/lib/quality.ts            Laplacian / 边缘 / 加权分数
-docs/LIMITS.md                blockers, ceiling, next steps (EN)
-docs/LIMITS.zh-CN.md          卡点 / 上限 / 短板 / 后续
+docs/LIMITS.md                blockers, ceiling vs cannot-do (EN)
+docs/LIMITS.zh-CN.md          卡点 / 上限 / 明确做不到
+docs/interaction-gaps.zh-CN.md 交互 P0 与剩余缺口
 src/components/EarCaptureApp.tsx
 ```
 

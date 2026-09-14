@@ -14,9 +14,22 @@ import { DEFAULT_SIM, SimulatorPanel, type SimState } from "./SimulatorPanel";
 import { useFaceLandmarker } from "../hooks/useFaceLandmarker";
 import { useWebcam } from "../hooks/useWebcam";
 import { useLocale } from "../i18n";
+import {
+  INITIAL_AUTOSHUTTER,
+  loadAutoShutterEnabled,
+  saveAutoShutterEnabled,
+  stepAutoshutter,
+  type AutoshutterState,
+} from "../lib/autoshutter";
+import { pickBurstByScore, scoreBurstFrame } from "../lib/burst";
 import { dwellPrompt, INITIAL_DWELL, type DwellState } from "../lib/dwell";
 import { matrixToFiswgEuler } from "../lib/euler";
-import { evaluateGuidance, isAngleStable } from "../lib/guidance";
+import {
+  captureUiFor,
+  evaluateGuidance,
+  isAngleStable,
+  type CaptureUi,
+} from "../lib/guidance";
 import {
   earRoiBox,
   faceHeightRatio,
@@ -39,9 +52,12 @@ type LiveState = {
   roll: number | null;
   prompt: PromptKey;
   allowCapture: boolean;
+  captureUi: CaptureUi;
   roi: RoiBox | null;
   quality: EarQuality | null;
   faceHeightRatio: number;
+  shutterRemainingMs: number | null;
+  overshootPastBestDeg: number;
 };
 
 const INITIAL_LIVE: LiveState = {
@@ -50,9 +66,12 @@ const INITIAL_LIVE: LiveState = {
   roll: null,
   prompt: "NO_FACE",
   allowCapture: false,
+  captureUi: "learning",
   roi: null,
   quality: null,
   faceHeightRatio: 0,
+  shutterRemainingMs: null,
+  overshootPastBestDeg: poseConfig.ready.overshootPastBestDeg,
 };
 
 export function EarCaptureApp() {
@@ -68,23 +87,26 @@ export function EarCaptureApp() {
 
   const [side, setSide] = useState<EarSide>("rightEar");
   const [bests, setBests] = useState<PersonalBestMap>(() => loadPersonalBests());
-  const [autoShutter, setAutoShutter] = useState(true);
+  const [autoShutter, setAutoShutter] = useState(() => loadAutoShutterEnabled());
   const [lastCapture, setLastCapture] = useState<string | null>(null);
   const [sim, setSim] = useState<SimState>(DEFAULT_SIM);
   const [live, setLive] = useState<LiveState>(INITIAL_LIVE);
   const [status, setStatus] = useState(() => t("loadingLandmarker"));
+  const [relearnOpen, setRelearnOpen] = useState(false);
 
   const sideRef = useRef(side);
   const bestsRef = useRef(bests);
   const simRef = useRef(sim);
   const autoShutterRef = useRef(autoShutter);
   const shutterLatch = useRef(false);
+  const shutterRef = useRef<AutoshutterState>(INITIAL_AUTOSHUTTER);
+  const cancelShutterRef = useRef(false);
+  const wasInReadyBand = useRef(false);
   const dwellRef = useRef<DwellState>(INITIAL_DWELL);
   const lastAngles = useRef<EulerDeg | null>(null);
   const stableFrames = useRef(0);
   const lastVideoTime = useRef(-1);
   const smootherRef = useRef<EulerSmoother | null>(null);
-  const readyBurst = useRef(0);
 
   sideRef.current = side;
   bestsRef.current = bests;
@@ -96,6 +118,12 @@ export function EarCaptureApp() {
     smootherRef.current = new EulerSmoother(o.minCutoff, o.beta, o.dCutoff);
   }, []);
 
+  useEffect(() => {
+    dwellRef.current = INITIAL_DWELL;
+    wasInReadyBand.current = false;
+    shutterRef.current = INITIAL_AUTOSHUTTER;
+  }, [side]);
+
   const personalBest = bests[side];
   const promptText = t(live.prompt);
 
@@ -103,40 +131,24 @@ export function EarCaptureApp() {
   liveRef.current = live;
 
   const captureStill = useCallback(() => {
-    const video = videoRef.current;
-    const canvas = document.createElement("canvas");
-    const snap = liveRef.current;
-    const label = tRef.current;
-    if (simRef.current.enabled || !video || video.readyState < 2) {
-      canvas.width = 960;
-      canvas.height = 540;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      drawSimStill(
-        ctx,
-        canvas.width,
-        canvas.height,
-        sideRef.current,
-        simRef.current,
-        snap.yaw,
-        snap.pitch,
-        snap.roll,
-        label(sideRef.current === "rightEar" ? "simStillRight" : "simStillLeft"),
-        label(sideRef.current === "rightEar" ? "roiRight" : "roiLeft"),
-      );
-    } else {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.drawImage(video, 0, 0);
+    const best = pickBurstByScore(shutterRef.current.burst);
+    if (best?.dataUrl) {
+      setLastCapture(best.dataUrl);
+      shutterLatch.current = true;
+      cancelShutterRef.current = true;
+      return;
     }
-    const url = canvas.toDataURL("image/png");
-    setLastCapture(url);
+    const url = renderStillDataUrl(
+      videoRef.current,
+      sideRef.current,
+      simRef.current,
+      liveRef.current.yaw,
+      liveRef.current.pitch,
+      liveRef.current.roll,
+      tRef.current,
+    );
+    if (url) setLastCapture(url);
   }, [videoRef]);
-
-  const captureStillRef = useRef(captureStill);
-  captureStillRef.current = captureStill;
 
   useEffect(() => {
     if (!lmLoading && landmarker) {
@@ -291,10 +303,11 @@ export function EarCaptureApp() {
       } else {
         stableFrames.current = 0;
       }
-      const yawDelta =
+      const yawDeltaSigned =
         lastAngles.current && angles
-          ? Math.abs(angles.yaw - lastAngles.current.yaw)
+          ? angles.yaw - lastAngles.current.yaw
           : 0;
+      const yawDelta = Math.abs(yawDeltaSigned);
       lastAngles.current = angles;
 
       if (hasFace && angles && quality) {
@@ -330,8 +343,13 @@ export function EarCaptureApp() {
         currentSide,
         bestsRef.current[currentSide],
         stableFrames.current,
-        { yawDelta },
+        {
+          yawDelta,
+          yawDeltaSigned,
+          wasInReadyBand: wasInReadyBand.current,
+        },
       );
+      wasInReadyBand.current = guidance.poseReady;
 
       dwellRef.current = dwellPrompt(
         dwellRef.current,
@@ -341,20 +359,50 @@ export function EarCaptureApp() {
       );
       const shown = dwellRef.current.displayed ?? guidance.prompt;
 
-      if (guidance.allowCapture) {
-        readyBurst.current += 1;
-      } else {
-        readyBurst.current = 0;
-      }
+      let shutterRemainingMs: number | null = null;
+      const cancelClick = cancelShutterRef.current;
+      cancelShutterRef.current = false;
 
-      if (
+      const wantBurst =
         guidance.allowCapture &&
         autoShutterRef.current &&
         !shutterLatch.current &&
-        readyBurst.current >= poseConfig.ready.burstFrames
-      ) {
+        shutterRef.current.phase !== "counting" &&
+        shutterRef.current.phase !== "cancelled";
+      const burstFrame =
+        wantBurst && shutterRef.current.burst.length < poseConfig.ready.burstFrames
+          ? {
+              score: scoreBurstFrame(quality, yaw),
+              capturedAt: now,
+              dataUrl:
+                renderStillDataUrl(
+                  video,
+                  currentSide,
+                  simState,
+                  yaw,
+                  pitch,
+                  roll,
+                  tRef.current,
+                ) ?? "",
+            }
+          : null;
+
+      const shutter = stepAutoshutter(shutterRef.current, {
+        now,
+        enabled: autoShutterRef.current && !shutterLatch.current,
+        allowCapture: guidance.allowCapture,
+        cancelClick,
+        frame: burstFrame && burstFrame.dataUrl ? burstFrame : null,
+        burstFrames: poseConfig.ready.burstFrames,
+        autoshutterMs: poseConfig.ready.autoshutterMs,
+      });
+      shutterRef.current = shutter.state;
+      if (shutter.state.phase === "counting") {
+        shutterRemainingMs = shutter.remainingMs;
+      }
+      if (shutter.fire) {
         shutterLatch.current = true;
-        captureStillRef.current();
+        setLastCapture(shutter.fire.dataUrl);
       }
       if (!guidance.allowCapture) {
         shutterLatch.current = false;
@@ -366,9 +414,12 @@ export function EarCaptureApp() {
         roll,
         prompt: shown,
         allowCapture: guidance.allowCapture,
+        captureUi: captureUiFor(shown, guidance.allowCapture),
         roi,
         quality,
         faceHeightRatio: heightRatio,
+        shutterRemainingMs,
+        overshootPastBestDeg: guidance.overshootPastBestDeg,
       });
     };
 
@@ -376,11 +427,15 @@ export function EarCaptureApp() {
     return () => cancelAnimationFrame(raf);
   }, [landmarker, videoRef]);
 
-  const recalibrateSide = () => {
+  const confirmRelearn = () => {
     const next = { ...bests, [side]: null };
     bestsRef.current = next;
     setBests(next);
     savePersonalBests(next);
+    dwellRef.current = INITIAL_DWELL;
+    wasInReadyBand.current = false;
+    shutterRef.current = INITIAL_AUTOSHUTTER;
+    setRelearnOpen(false);
   };
 
   const downloadCapture = () => {
@@ -436,7 +491,9 @@ export function EarCaptureApp() {
 
       <p className="status">{status}</p>
 
-      <section className={`stage ${live.allowCapture ? "ready" : ""}`}>
+      <section
+        className={`stage${live.captureUi === "ready" ? " ready" : live.captureUi === "hold" ? " hold" : ""}`}
+      >
         <video
           ref={videoRef}
           className="cam"
@@ -446,9 +503,31 @@ export function EarCaptureApp() {
         />
         <canvas ref={overlayRef} className="overlay" />
         <canvas ref={sampleRef} className="scratch" />
-        <div className="prompt" data-ready={live.allowCapture}>
+        <div
+          className="prompt"
+          data-ready={live.allowCapture}
+          data-ui={live.captureUi}
+        >
           {promptText}
         </div>
+        {live.shutterRemainingMs != null ? (
+          <div className="shutter-count">
+            <span>
+              {t("autoshutterCounting", {
+                seconds: (live.shutterRemainingMs / 1000).toFixed(1),
+              })}
+            </span>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => {
+                cancelShutterRef.current = true;
+              }}
+            >
+              {t("autoshutterCancel")}
+            </button>
+          </div>
+        ) : null}
         <span className="stage-tag">{stageHint}</span>
       </section>
 
@@ -457,6 +536,8 @@ export function EarCaptureApp() {
         pitch={live.pitch}
         roll={live.roll}
         bestYaw={personalBest}
+        captureUi={live.captureUi}
+        overshootPastBestDeg={live.overshootPastBestDeg}
       />
 
       <div className="dock">
@@ -469,7 +550,8 @@ export function EarCaptureApp() {
         <button
           type="button"
           className="capture"
-          disabled={!live.allowCapture}
+          data-ui={live.captureUi}
+          disabled={live.captureUi !== "ready"}
           onClick={captureStill}
         >
           {t("capture")}
@@ -478,7 +560,11 @@ export function EarCaptureApp() {
           <input
             type="checkbox"
             checked={autoShutter}
-            onChange={(e) => setAutoShutter(e.target.checked)}
+            onChange={(e) => {
+              const on = e.target.checked;
+              setAutoShutter(on);
+              saveAutoShutterEnabled(on);
+            }}
           />
           {t("autoShutter")}
         </label>
@@ -493,15 +579,39 @@ export function EarCaptureApp() {
       </div>
 
       <div className="dock">
-        <span className="calib-note">
-          {personalBest
-            ? t("learnedNote")
-            : t("learningNote")}
-        </span>
-        <button type="button" className="ghost" onClick={recalibrateSide}>
+        <button
+          type="button"
+          className="ghost"
+          onClick={() => setRelearnOpen(true)}
+        >
           {t("relearn")}
         </button>
       </div>
+
+      {relearnOpen ? (
+        <div className="modal-backdrop" role="presentation">
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="relearn-title"
+          >
+            <p id="relearn-title">{t("relearnConfirm")}</p>
+            <div className="modal-actions">
+              <button type="button" className="capture" onClick={confirmRelearn}>
+                {t("relearnConfirmYes")}
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => setRelearnOpen(false)}
+              >
+                {t("relearnConfirmNo")}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {lastCapture ? (
         <figure className="preview">
@@ -519,6 +629,43 @@ export function EarCaptureApp() {
       </footer>
     </div>
   );
+}
+
+function renderStillDataUrl(
+  video: HTMLVideoElement | null,
+  side: EarSide,
+  sim: SimState,
+  yaw: number | null,
+  pitch: number | null,
+  roll: number | null,
+  label: (key: "simStillRight" | "simStillLeft" | "roiRight" | "roiLeft") => string,
+): string | null {
+  const canvas = document.createElement("canvas");
+  if (sim.enabled || !video || video.readyState < 2) {
+    canvas.width = 960;
+    canvas.height = 540;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    drawSimStill(
+      ctx,
+      canvas.width,
+      canvas.height,
+      side,
+      sim,
+      yaw,
+      pitch,
+      roll,
+      label(side === "rightEar" ? "simStillRight" : "simStillLeft"),
+      label(side === "rightEar" ? "roiRight" : "roiLeft"),
+    );
+  } else {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(video, 0, 0);
+  }
+  return canvas.toDataURL("image/png");
 }
 
 function drawCameraOverlay(

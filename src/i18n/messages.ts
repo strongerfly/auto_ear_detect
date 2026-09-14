@@ -15,6 +15,14 @@ type UiMessageKey =
   | "autoShutter"
   | "downloadLast"
   | "relearn"
+  | "relearnConfirm"
+  | "relearnConfirmYes"
+  | "relearnConfirmNo"
+  | "autoshutterCounting"
+  | "autoshutterCancel"
+  | "debugSummary"
+  | "hudHold"
+  | "hudReady"
   | "lastCaptureCaption"
   | "lastCaptureAlt"
   | "footer"
@@ -68,7 +76,7 @@ const zh: Messages = {
   SWEEP_LEFT_EAR: "拍左耳：慢慢向右转，找到耳朵最清楚的角度",
   TURN_MORE: "再转一点点",
   TURN_BACK: "往回一点，朝更清楚的那边",
-  TURN_BACK_OVERSHOOT: "到头了，往回一点",
+  TURN_BACK_OVERSHOOT: "往回一点，刚才那边更清楚",
   SLOW_DOWN: "转慢一点",
   WRONG_SIDE: "方向反了，按提示转，不要跟着镜子反着来",
   CLEAR_HAIR: "拨开耳边头发（糊了或反光也先试试）",
@@ -90,6 +98,15 @@ const zh: Messages = {
   autoShutter: "自动快门",
   downloadLast: "下载上次拍摄",
   relearn: "重新学习此侧",
+  relearnConfirm:
+    "重新学习会忘掉这侧刚记住的角度，需要再慢慢转一次。确定吗？",
+  relearnConfirmYes: "确定，重新学习",
+  relearnConfirmNo: "取消",
+  autoshutterCounting: "即将拍摄 {seconds}",
+  autoshutterCancel: "取消这次自动拍",
+  debugSummary: "调试：角度数字",
+  hudHold: "请保持",
+  hudReady: "可以拍了",
   lastCaptureCaption: "刚拍好（保存的照片不是镜像，左右和真人一样）",
   lastCaptureAlt: "刚拍好的耳部照片",
   footer: "左右指身体的左右。预览像镜子，保存的照片不是。",
@@ -123,13 +140,13 @@ const zh: Messages = {
 
   helpTitle: "使用说明",
   helpIntro:
-    "页头可切中文 / English。先点「拍左耳」或「拍右耳」（身体的左右，不是镜子里的左右）。用前置摄像头，按提示慢慢转头——转的是头，不是电脑或手机。转的时候系统会自己记住这侧最清楚的角度；第一次要慢慢转过，提示「可以拍了」才会开拍。默认开着自动快门，到点会自己拍。拍完一侧，再点另一侧重转。",
+    "页头可切中文 / English。先点「拍左耳」或「拍右耳」（身体的左右，不是镜子里的左右）。用前置摄像头，按提示慢慢转头——转的是头，不是电脑或手机。转的时候系统会自己记住这侧最清楚的角度；第一次只说怎么转，记住峰值之后才会请你保持或拍摄。自动快门第一次默认关上；打开后会倒数，觉得不对可以取消。拍完一侧，再点另一侧重转。",
   helpTurnHeading: "怎么转",
   helpTurnBody:
-    "拍右耳：向左转。拍左耳：向右转。跟着提示走，不要对着镜子反着学。转过头很正常——「往回一点」是朝刚才更清楚的那边转回去，别继续转到后脑勺。转到头了会说「到头了，往回一点」。转太快会请你转慢一点。框在另一只耳朵上时，点另一侧按钮，系统不会自己改。",
+    "拍右耳：向左转。拍左耳：向右转。跟着提示走，不要对着镜子反着学。转过头很正常——系统先记住最清楚的角度，过了才会说「往回一点，刚才那边更清楚」。往回走时请保持，别再往更侧里转。转太快会请你转慢一点。框在另一只耳朵上时，点另一侧按钮，系统不会自己改。",
   helpStuckHeading: "拍不了的时候",
   helpStuckBody:
-    "摄像头被拒：到浏览器设置里允许这个网站使用摄像头。头发挡住、糊了或反光：拨开头发、换亮一点。角度记错、换了眼镜或发型、一直出不了「可以拍了」：点「重新学习此侧」（只清这一侧），再慢慢转一次。误点的话，拍不了，直到重新学会。",
+    "摄像头被拒：到浏览器设置里允许这个网站使用摄像头。头发挡住、糊了或反光：拨开头发、换亮一点。角度记错、换了眼镜或发型、一直出不了「可以拍了」：点「重新学习此侧」，确认后再慢慢转一次（只清这一侧）。误点确认的话，拍不了，直到重新学会。",
   helpLimitsHeading: "能做什么、不能做什么",
   helpLimitsBody:
     "能拍一只耳朵朝向镜头的清晰照，不是医院耳镜，也不会检查你是不是点错了耳朵。头大致摆正、脸在框里、距离合适。太暗、太亮或头发挡住会失败。只有侧着转头时才会学习（几乎正面或转到后脑勺都不算）。预览像镜子，保存的照片不是，左右不会反。",
@@ -148,7 +165,7 @@ const en: Messages = {
     "Left ear: turn slowly right until the ear looks clearest",
   TURN_MORE: "A little more",
   TURN_BACK: "Ease back toward the clearer pose",
-  TURN_BACK_OVERSHOOT: "That's as far as it goes — ease back",
+  TURN_BACK_OVERSHOOT: "Ease back a little — it was clearer just now",
   SLOW_DOWN: "Turn a bit slower",
   WRONG_SIDE: "Other way — follow the prompt, not the mirror",
   CLEAR_HAIR: "Tuck hair away from the ear (also try this if it's blurry or shiny)",
@@ -170,6 +187,15 @@ const en: Messages = {
   autoShutter: "Auto-shutter",
   downloadLast: "Download last capture",
   relearn: "Relearn this side",
+  relearnConfirm:
+    "Relearn this side? The app will forget the angle it just remembered, and you’ll need to turn slowly again.",
+  relearnConfirmYes: "Yes, relearn",
+  relearnConfirmNo: "Cancel",
+  autoshutterCounting: "Capturing in {seconds}",
+  autoshutterCancel: "Cancel this auto-shot",
+  debugSummary: "Debug: angle numbers",
+  hudHold: "Hold still",
+  hudReady: "Ready to capture",
   lastCaptureCaption:
     "Just captured (saved photo is not mirrored — left/right match real life)",
   lastCaptureAlt: "Just captured ear photo",
@@ -207,13 +233,13 @@ const en: Messages = {
 
   helpTitle: "Instructions",
   helpIntro:
-    "Switch 中文 / English in the header. Tap Left ear or Right ear first (your body, not the mirror). Use the front camera and turn your head as prompted — the head, not the laptop or phone. While you turn slowly, the app remembers the clearest angle for that side. The first time, capture stays off until you’ve swept slowly. Auto-shutter is on by default and will shoot when it says Ready. After one ear, tap the other side and turn again.",
+    "Switch 中文 / English in the header. Tap Left ear or Right ear first (your body, not the mirror). Use the front camera and turn your head as prompted — the head, not the laptop or phone. While you turn slowly, the app remembers the clearest angle for that side. Until that peak is locked, it only tells you how to turn — it won’t ask you to hold still or shoot. Auto-shutter starts off; turn it on for a cancelable countdown. After one ear, tap the other side and turn again.",
   helpTurnHeading: "How to turn",
   helpTurnBody:
-    "Right ear: turn left. Left ear: turn right. Follow the prompt; don’t copy the mirror. Overshoot is normal — “ease back” means toward the clearer pose, not past the back of your head. At the far edge you’ll see “that’s as far as it goes.” If you turn too fast, slow down. If the box is on the other ear, tap the other side — it won’t switch for you.",
+    "Right ear: turn left. Left ear: turn right. Follow the prompt; don’t copy the mirror. Overshoot is normal — after the app locks the clearest angle, going past it says “ease back a little — it was clearer just now.” While you return, hold still; don’t keep turning farther. If you turn too fast, slow down. If the box is on the other ear, tap the other side — it won’t switch for you.",
   helpStuckHeading: "If it won’t capture",
   helpStuckBody:
-    "Camera denied: allow this site in your browser settings. Hair, blur, or glare: tuck hair aside and find better light. Wrong lock, new glasses or haircut, or you never reach Ready: tap Relearn this side (clears this side only) and turn slowly again. An accidental tap blocks capture until that side is relearned.",
+    "Camera denied: allow this site in your browser settings. Hair, blur, or glare: tuck hair aside and find better light. Wrong lock, new glasses or haircut, or you never reach Ready: tap Relearn this side, confirm, then turn slowly again (this side only). An accidental confirm blocks capture until that side is relearned.",
   helpLimitsHeading: "What it can and can’t do",
   helpLimitsBody:
     "It can take a clear photo of one ear facing the camera. It is not a clinical ear scanner, and it won’t check that you picked the correct ear. Keep your head roughly upright, face in frame, at a comfortable distance. Dark, bright, or hair-blocked shots fail. It only learns while you turn to the side — not almost frontal, not past the back of the head. The preview is a mirror; the saved photo is not.",
@@ -259,8 +285,17 @@ export function userFacingKeys(): MessageKey[] {
     "TURN_BACK_OVERSHOOT",
     "learningNote",
     "relearn",
+    "relearnConfirm",
     "clickToStart",
+    "autoshutterCounting",
+    "debugSummary",
   ];
+}
+
+const CALIBRATION_COPY = /校准/;
+
+export function looksLikeCalibrationWording(text: string): boolean {
+  return CALIBRATION_COPY.test(text);
 }
 
 export function looksLikeRigidAngleChecklist(text: string): boolean {

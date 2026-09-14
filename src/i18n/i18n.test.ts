@@ -8,7 +8,9 @@ import {
 } from "./locale";
 import {
   interpolate,
+  looksLikeCalibrationWording,
   looksLikeRigidAngleChecklist,
+  messagesFor,
   translate,
   userFacingKeys,
 } from "./messages";
@@ -70,6 +72,13 @@ describe("string lookup", () => {
     expect(translate("en", "helpTitle")).toBe("Instructions");
     expect(translate("zh", "relearn")).toBe("重新学习此侧");
     expect(translate("en", "relearn")).toBe("Relearn this side");
+    expect(translate("zh", "relearnConfirm")).toContain("确定吗");
+    expect(translate("zh", "TURN_BACK_OVERSHOOT")).toBe(
+      "往回一点，刚才那边更清楚",
+    );
+    expect(translate("en", "TURN_BACK_OVERSHOOT")).toContain(
+      "it was clearer just now",
+    );
   });
 
   it("keeps user-facing help and sweep copy free of rigid angle checklists", () => {
@@ -77,6 +86,14 @@ describe("string lookup", () => {
       expect(looksLikeRigidAngleChecklist(translate("zh", key))).toBe(false);
       expect(looksLikeRigidAngleChecklist(translate("en", key))).toBe(false);
     }
+  });
+
+  it("never uses 校准 wording in Chinese UI copy", () => {
+    for (const text of Object.values(messagesFor("zh"))) {
+      expect(looksLikeCalibrationWording(text)).toBe(false);
+    }
+    expect(translate("zh", "relearn")).not.toContain("校准");
+    expect(translate("zh", "relearnConfirm")).not.toContain("校准");
   });
 
   it("interpolates placeholders", () => {

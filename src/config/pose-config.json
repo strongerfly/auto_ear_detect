@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "captureMode": "qualityPeakYaw",
   "coordinateConvention": {
     "yawPositive": "rightEarVisible",
@@ -50,6 +50,8 @@
   },
   "ready": {
     "bandDegAroundBest": 5,
+    "exitBandDeg": 8,
+    "overshootPastBestDeg": 12,
     "scoreRatioOfBest": 0.92,
     "stableFrames": 12,
     "maxDeltaYawDeg": 3,
@@ -59,6 +61,7 @@
     "brightnessMax": 200,
     "burstFrames": 3,
     "pickBurstBy": "score",
+    "autoshutterMs": 1200,
     "requireUserConfirm": false,
     "pitchMaxAbs": 10,
     "rollMaxAbs": 8
