@@ -36,7 +36,7 @@ What works **reliably today** in the browser, with a webcam or the pose simulato
 
 - Per-side **quality-peak yaw** while the user turns. Search \|yaw\| **35–90°**, soft preferred **40–80°**. A **~45°** peak can READY.
 - Score = **0.45 Laplacian + 0.35 edge energy + 0.20 side-face content**. `bestYaw` is the yaw at the running max; near-ties use `smallerAbsYaw`.
-- **READY** (all of): face in frame and size OK; this side has a locked `bestYaw`; current yaw within **±5°** of that best (exit hysteresis **8°**); pitch/roll in ready limits; ~**12** stable frames; score ≥ **92%** of the personal peak; brightness 60–200. **No** yaw ∈ [70, 90]. **No** “confirm the ear is frontal”.
+- **READY** (all of): face in frame and size OK; this side has a locked `bestYaw`; current yaw within **±5°** of that best (`bandDegAroundBest` / enter band — **not** 8). `exitBandDeg` **8°** is hysteresis so READY does not flicker; it is not a wider enter gate. Pitch/roll in ready limits; ~**12** stable frames; score ≥ **92%** of the personal peak; brightness 60–200. **No** yaw ∈ [70, 90]. **No** “confirm the ear is frontal”.
 - Unlocked (still learning): **sweep intro only** — a 60° prior never fires TURN_MORE / TURN_BACK / HOLD.
 - Locked overshoot: TURN_BACK toward the **personal** peak; outer-edge “到头了，往回一点”.
 - Face lost: pause scoring, **keep** `bestYaw`, recover toward the peak.

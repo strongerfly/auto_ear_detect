@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { poseConfig } from "../config";
-import { evaluateGuidance } from "./guidance";
+import { evaluateGuidance, isAngleStable } from "./guidance";
 import { dwellMsFor, dwellPrompt, INITIAL_DWELL } from "./dwell";
 import { effectiveTargets } from "./effective-targets";
 import {
@@ -91,6 +91,37 @@ describe("pickPrompt priority", () => {
       evaluateGuidance(base({ pitch: -15, yaw: 60 }), poseConfig, "rightEar", null, 0)
         .prompt,
     ).toBe("PITCH_UP");
+  });
+
+  it("near a locked peak, roll beats pitch, pitch beats yaw", () => {
+    const best = peakAt(45);
+    expect(
+      evaluateGuidance(
+        base({ yaw: 45, roll: 14, pitch: 16 }),
+        poseConfig,
+        "rightEar",
+        best,
+        12,
+      ).prompt,
+    ).toBe("FIX_ROLL");
+    expect(
+      evaluateGuidance(
+        base({ yaw: 45, roll: 0, pitch: 16 }),
+        poseConfig,
+        "rightEar",
+        best,
+        12,
+      ).prompt,
+    ).toBe("PITCH_DOWN");
+    expect(
+      evaluateGuidance(
+        base({ yaw: 28, roll: 0, pitch: 0 }),
+        poseConfig,
+        "rightEar",
+        best,
+        0,
+      ).prompt,
+    ).toBe("TURN_MORE");
   });
 
   it("right-ear sweep / more / back vs the soft prior", () => {
@@ -480,6 +511,75 @@ describe("quality-driven personal best yaw", () => {
     const personal = effectiveTargets("rightEar", peakAt(45), poseConfig);
     expect(personal.yawCenter).toBe(45);
     expect(personal.locked).toBe(true);
+  });
+});
+
+describe("QA precheck: search 35–90, READY ±5°, never 70–90 alone", () => {
+  it("searchYawMaxAbs is 90 on both ears, not 100", () => {
+    expect(poseConfig.search.rightEar.yawAbsMin).toBe(35);
+    expect(poseConfig.search.rightEar.yawAbsMax).toBe(90);
+    expect(poseConfig.search.leftEar.yawAbsMin).toBe(35);
+    expect(poseConfig.search.leftEar.yawAbsMax).toBe(90);
+    expect(yawInSearchWindow(90, "rightEar")).toBe(true);
+    expect(yawInSearchWindow(100, "rightEar")).toBe(false);
+    expect(yawInSearchWindow(95, "rightEar")).toBe(false);
+  });
+
+  it("readyMaxAbsYawError / bandDegAroundBest is 5 (exit 8 is hysteresis only)", () => {
+    expect(poseConfig.ready.bandDegAroundBest).toBe(5);
+    expect(poseConfig.ready.exitBandDeg).toBe(8);
+    const best = peakAt(45);
+    const enterAt51 = evaluateGuidance(
+      base({ yaw: 51 }),
+      poseConfig,
+      "rightEar",
+      best,
+      12,
+    );
+    expect(enterAt51.poseReady).toBe(false);
+    expect(enterAt51.allowCapture).toBe(false);
+    const enterAt50 = evaluateGuidance(
+      base({ yaw: 50 }),
+      poseConfig,
+      "rightEar",
+      best,
+      12,
+    );
+    expect(enterAt50.poseReady).toBe(true);
+    expect(enterAt50.allowCapture).toBe(true);
+  });
+
+  it("peak ~45° can READY; yaw 70–90 with no locked peak cannot", () => {
+    const at45 = evaluateGuidance(
+      base({ yaw: 45 }),
+      poseConfig,
+      "rightEar",
+      peakAt(45),
+      12,
+    );
+    expect(at45.prompt).toBe("READY");
+    expect(at45.allowCapture).toBe(true);
+
+    for (const yaw of [70, 80, 90]) {
+      const r = evaluateGuidance(base({ yaw }), poseConfig, "rightEar", null, 12);
+      expect(r.allowCapture).toBe(false);
+      expect(r.prompt).not.toBe("READY");
+      expect(r.prompt).toBe("SWEEP_RIGHT_EAR");
+    }
+  });
+
+  it("stability gates: first frame is never stable; deltas under 3° are", () => {
+    const now = { yaw: 45, pitch: 0, roll: 0 };
+    expect(isAngleStable(now, null, poseConfig)).toBe(false);
+    expect(
+      isAngleStable(now, { yaw: 47, pitch: 1, roll: -1 }, poseConfig),
+    ).toBe(true);
+    expect(
+      isAngleStable(now, { yaw: 50, pitch: 0, roll: 0 }, poseConfig),
+    ).toBe(false);
+    const unstable = evaluateGuidance(base({ yaw: 45 }), poseConfig, "rightEar", peakAt(45), 3);
+    expect(unstable.allowCapture).toBe(false);
+    expect(unstable.prompt).toBe("HOLD_NEAR_PEAK");
   });
 });
 
