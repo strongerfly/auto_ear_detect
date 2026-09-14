@@ -23,7 +23,12 @@ export type PromptKey =
   | "TOO_DARK"
   | "TOO_BRIGHT"
   | "MULTI_FACE"
-  | "READY";
+  | "READY"
+  | "INTRO_LEFT"
+  | "INTRO_RIGHT"
+  | "STUCK_NO_PROGRESS"
+  | "SOFT_READY"
+  | "EAR_OUT_OF_FRAME";
 
 export type PoseConfig = typeof poseConfigJson;
 
@@ -51,4 +56,9 @@ export const PROMPT_KEYS: PromptKey[] = [
   "TOO_BRIGHT",
   "MULTI_FACE",
   "READY",
+  "INTRO_LEFT",
+  "INTRO_RIGHT",
+  "STUCK_NO_PROGRESS",
+  "SOFT_READY",
+  "EAR_OUT_OF_FRAME",
 ];

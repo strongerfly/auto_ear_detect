@@ -46,12 +46,40 @@ export function meanVisibility(landmarks: Landmark[]): number {
   return n === 0 ? 1 : sum / n;
 }
 
-export function earRoiBox(
+export type EarRoiLayout = {
+  roi: RoiBox | null;
+  /** 0–1 fraction of the padded ear box that still sits inside the frame. */
+  visibleRatio: number;
+};
+
+const EAR_IN_FRAME_RATIO = 0.65;
+
+export function visibleRoiRatio(
+  raw: { minX: number; minY: number; maxX: number; maxY: number },
+  width: number,
+  height: number,
+): number {
+  const rawW = Math.max(1, raw.maxX - raw.minX);
+  const rawH = Math.max(1, raw.maxY - raw.minY);
+  const x0 = Math.max(0, raw.minX);
+  const y0 = Math.max(0, raw.minY);
+  const x1 = Math.min(width, raw.maxX);
+  const y1 = Math.min(height, raw.maxY);
+  const visW = Math.max(0, x1 - x0);
+  const visH = Math.max(0, y1 - y0);
+  return (visW * visH) / (rawW * rawH);
+}
+
+export function earInFrame(visibleRatio: number): boolean {
+  return visibleRatio >= EAR_IN_FRAME_RATIO;
+}
+
+export function earRoiLayout(
   landmarks: Landmark[],
   side: "leftEar" | "rightEar",
   width: number,
   height: number,
-): RoiBox | null {
+): EarRoiLayout {
   const idx = side === "leftEar" ? LEFT_EAR_LANDMARKS : RIGHT_EAR_LANDMARKS;
   const pts: { x: number; y: number }[] = [];
   for (const i of idx) {
@@ -59,7 +87,7 @@ export function earRoiBox(
     if (!p) continue;
     pts.push({ x: p.x * width, y: p.y * height });
   }
-  if (pts.length < 3) return null;
+  if (pts.length < 3) return { roi: null, visibleRatio: 0 };
 
   let minX = Infinity;
   let minY = Infinity;
@@ -88,10 +116,20 @@ export function earRoiBox(
   minY -= padY;
   maxY += padY;
 
+  const visibleRatio = visibleRoiRatio({ minX, minY, maxX, maxY }, width, height);
   const x = Math.max(0, Math.floor(minX));
   const y = Math.max(0, Math.floor(minY));
   const w = Math.min(width - x, Math.ceil(maxX) - x);
   const h = Math.min(height - y, Math.ceil(maxY) - y);
-  if (w < 8 || h < 8) return null;
-  return { x, y, w, h };
+  if (w < 8 || h < 8) return { roi: null, visibleRatio };
+  return { roi: { x, y, w, h }, visibleRatio };
+}
+
+export function earRoiBox(
+  landmarks: Landmark[],
+  side: "leftEar" | "rightEar",
+  width: number,
+  height: number,
+): RoiBox | null {
+  return earRoiLayout(landmarks, side, width, height).roi;
 }

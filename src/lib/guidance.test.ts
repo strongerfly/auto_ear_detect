@@ -230,7 +230,9 @@ describe("pickPrompt priority", () => {
   it("promptForDisplay never shows READY on a gray shutter", () => {
     expect(promptForDisplay("READY", false)).toBe("NEAR_PEAK");
     expect(promptForDisplay("HOLD_STILL", false)).toBe("NEAR_PEAK");
+    expect(promptForDisplay("SOFT_READY", false)).toBe("NEAR_PEAK");
     expect(promptForDisplay("READY", true)).toBe("READY");
+    expect(promptForDisplay("SOFT_READY", true)).toBe("SOFT_READY");
     expect(promptForDisplay("SWEEP_RIGHT_EAR", false)).toBe("SWEEP_RIGHT_EAR");
   });
 
@@ -454,6 +456,52 @@ describe("quality-driven personal best yaw", () => {
     const personal = effectiveTargets("rightEar", peakAt(45), poseConfig);
     expect(personal.yawCenter).toBe(45);
     expect(personal.locked).toBe(true);
+  });
+
+  it("EAR_OUT_OF_FRAME when the ear should be visible but the ROI is clipped", () => {
+    const best = peakAt(45);
+    expect(
+      evaluateGuidance(
+        base({ yaw: 45 }),
+        poseConfig,
+        "rightEar",
+        best,
+        0,
+        { earInFrame: false },
+      ).prompt,
+    ).toBe("EAR_OUT_OF_FRAME");
+    expect(
+      evaluateGuidance(
+        base({ yaw: 10 }),
+        poseConfig,
+        "rightEar",
+        null,
+        0,
+        { earInFrame: false },
+      ).prompt,
+    ).toBe("SWEEP_RIGHT_EAR");
+  });
+
+  it("SOFT_READY is distinct from READY when the peak is weak/flat", () => {
+    const best = peakAt(45);
+    const soft = evaluateGuidance(
+      base({ yaw: 45 }),
+      poseConfig,
+      "rightEar",
+      best,
+      12,
+      { softPeak: true },
+    );
+    expect(soft.allowCapture).toBe(true);
+    expect(soft.prompt).toBe("SOFT_READY");
+    const ready = evaluateGuidance(
+      base({ yaw: 45 }),
+      poseConfig,
+      "rightEar",
+      best,
+      12,
+    );
+    expect(ready.prompt).toBe("READY");
   });
 });
 

@@ -38,7 +38,7 @@ export function SimulatorPanel({
     onChange({ ...sim, quality: { ...sim.quality, ...patch } });
 
   return (
-    <details className="sim" open={sim.enabled}>
+    <details className="sim">
       <summary>{t("simSummary")}</summary>
       <label className="sim-row">
         <input
