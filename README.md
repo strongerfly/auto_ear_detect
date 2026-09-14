@@ -4,13 +4,11 @@
 
 [![CI](https://github.com/strongerfly/auto_ear_detect/actions/workflows/ci.yml/badge.svg)](https://github.com/strongerfly/auto_ear_detect/actions/workflows/ci.yml)
 
-Real-time **head-pose guided ear capture**. Turn slowly until the ear looks clearest — the app remembers that angle for each side. It is not a rigid 70–90° pose checklist.
+Real-time **head-pose guided ear capture**. Turn slowly until the ear looks clearest — the app remembers that angle for each side. It learns a personal pose; it does not assume one universal ear angle.
 
 Stack: **Vite + React + TypeScript** + `@mediapipe/tasks-vision` Face Landmarker (`VIDEO` mode, `outputFacialTransformationMatrixes: true`).
 
 **中文 / English** toggle in the header. Preference is stored in `localStorage` (`auto-ear-detect:locale:v1`). Default: browser `zh*` → Chinese, otherwise English.
-
-Honest ceiling and shortfalls: **[docs/LIMITS.md](docs/LIMITS.md)** · **[docs/LIMITS.zh-CN.md](docs/LIMITS.zh-CN.md)**.
 
 ## How to use
 
@@ -77,6 +75,14 @@ READY when all of:
 5. Score ≥ **92%** of the personal peak, brightness in range
 
 No “confirm the ear is frontal” step. Auto-shutter waits 3 ready frames. **Relearn this side** clears the stored peak; learning itself is automatic.
+
+## Ceiling and shortfalls（上限与短板）
+
+What this build **can** do: on-device Face Landmarker for turn direction, plus ear-ROI sharpness to auto-learn a **personal** clearest pinna frame while the user turns. READY follows that peak, not a universal pose band.
+
+What it **cannot** pretend: it is not a clinical ear scanner, it does not see the ear canal, and it does not “understand” ears. Tracker drop at deep profile, hair/blur false peaks, and camera-dependent Laplacian scores still need better models and labeled side-face data. Haircut or glasses can stale a remembered peak — that is why **Relearn this side** exists.
+
+Full table (blockers / ceiling / next / conditions): **[docs/LIMITS.md](docs/LIMITS.md)** · **[docs/LIMITS.zh-CN.md](docs/LIMITS.zh-CN.md)**.
 
 ## Tuning
 

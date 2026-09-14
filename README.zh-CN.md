@@ -4,13 +4,11 @@
 
 [![CI](https://github.com/strongerfly/auto_ear_detect/actions/workflows/ci.yml/badge.svg)](https://github.com/strongerfly/auto_ear_detect/actions/workflows/ci.yml)
 
-实时**头部姿态引导耳廓拍摄**。慢慢转，找到耳朵最清楚的角度——应用会记住每一侧。不是对着 70–90° 打卡。
+实时**头部姿态引导耳廓拍摄**。慢慢转，找到耳朵最清楚的角度——应用会记住每一侧。学的是这个人这一侧的角度，不是假定人人同一个姿势。
 
 技术栈：**Vite + React + TypeScript** + `@mediapipe/tasks-vision` Face Landmarker（`VIDEO` 模式，`outputFacialTransformationMatrixes: true`）。
 
 页头切换 **中文 / English**。偏好保存在 `localStorage`（`auto-ear-detect:locale:v1`）。默认：浏览器语言 `zh*` 用中文，否则英文。
-
-上限与短板：**[docs/LIMITS.zh-CN.md](docs/LIMITS.zh-CN.md)** · **[docs/LIMITS.md](docs/LIMITS.md)**。
 
 ## 怎么用
 
@@ -77,6 +75,14 @@ Euler 顺序为 **YXZ**（内旋 `R = Ry · Rx · Rz`），单位为**度**。4�
 5. 分数 ≥ 该侧峰值的 **92%**，亮度在范围内
 
 没有「请确认耳朵已经正了」这一步。自动快门等 3 帧就绪再拍。**重新学习此侧**会清掉记住的峰值；学习本身是自动的。
+
+## 上限与短板
+
+这版**能做的**：用端上 Face Landmarker 管转向，用耳区清晰度在转头过程里自动学这个人这一侧**最清楚的耳廓帧**。能不能拍，跟个人峰值走，不跟人人同一套固定姿势走。
+
+这版**不能装懂的**：不是医院耳镜，看不见外耳道，也不理解「耳朵」。大侧面跟丢、头发/模糊假峰、清晰度分数随摄像头漂移，都还要更好的模型和侧脸标注。换发型或眼镜会让旧峰值过期——所以才有 **重新学习此侧**。
+
+完整表（卡点 / 上限 / 后续 / 条件）：**[docs/LIMITS.zh-CN.md](docs/LIMITS.zh-CN.md)** · **[docs/LIMITS.md](docs/LIMITS.md)**。
 
 ## 调参
 
