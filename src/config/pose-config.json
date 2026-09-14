@@ -19,14 +19,21 @@
   },
   "search": {
     "rightEar": {
-      "yawAbsMin": 35, "yawAbsMax": 90,
-      "preferredAbsMin": 40, "preferredAbsMax": 80
+      "yawAbsMin": 35,
+      "yawAbsMax": 90,
+      "preferredAbsMin": 40,
+      "preferredAbsMax": 80
     },
     "leftEar": {
-      "yawAbsMin": 35, "yawAbsMax": 90,
-      "preferredAbsMin": 40, "preferredAbsMax": 80
+      "yawAbsMin": 35,
+      "yawAbsMax": 90,
+      "preferredAbsMin": 40,
+      "preferredAbsMax": 80
     },
-    "pitchMin": -10, "pitchMax": 10, "rollMin": -8, "rollMax": 8,
+    "pitchMin": -10,
+    "pitchMax": 10,
+    "rollMin": -8,
+    "rollMax": 8,
     "minSweepCoverageRatio": 0.6,
     "allowResweepOnce": true,
     "tieBreak": "smallerAbsYaw",
@@ -51,6 +58,7 @@
   },
   "ready": {
     "bandDegAroundBest": 5,
+    "exitBandDeg": 8,
     "scoreRatioOfBest": 0.92,
     "stableFrames": 12,
     "maxDeltaYawDeg": 3,

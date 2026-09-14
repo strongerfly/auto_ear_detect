@@ -10,12 +10,14 @@ Stack: **Vite + React + TypeScript** + `@mediapipe/tasks-vision` Face Landmarker
 
 **中文 / English** toggle in the header. Preference is stored in `localStorage` (`auto-ear-detect:locale:v1`). Default: browser `zh*` → Chinese, otherwise English.
 
+Limits, blockers, and what we will not pretend to solve: **[docs/LIMITS.md](docs/LIMITS.md)** · **[docs/LIMITS.zh-CN.md](docs/LIMITS.zh-CN.md)**. Interaction coverage: **[docs/ear-guide-interaction-gaps.md](docs/ear-guide-interaction-gaps.md)**.
+
 ## How to use
 
 1. Allow the camera. Switch language in the header if you want.
 2. Tap **Left ear** or **Right ear** (your body, not the mirror). Right ear → turn left; left ear → turn right.
 3. Turn your **head** slowly (not the laptop/phone) until the ear looks clearest. The first sweep is how the app learns that side; capture stays off until then.
-4. Wait for **Ready to capture**. Auto-shutter is on by default and will shoot. Then switch sides and turn again.
+4. Wait for **Ready to capture**. Auto-shutter is **off** by default — turn it on if you want the app to shoot for you. Then switch sides and turn again.
 
 If the remembered angle is wrong, use **Relearn this side** and turn slowly once more. Expand **Instructions** in the app for overshoot, camera permission, and limits.
 
@@ -70,11 +72,13 @@ READY when all of:
 
 1. Face present, size in `[minFaceHeightRatio, maxFaceHeightRatio]`
 2. A personal **bestYaw** is locked for this side
-3. Current yaw within **±5°** of that best; pitch/roll inside ready limits
+3. Current yaw within **±5°** of that best (exit hysteresis **8°** once already ready); pitch/roll inside ready limits
 4. Stable ~**12** frames
 5. Score ≥ **92%** of the personal peak, brightness in range
 
-No “confirm the ear is frontal” step. Auto-shutter waits 3 ready frames. **Relearn this side** clears the stored peak; learning itself is automatic.
+No “confirm the ear is frontal” step. Auto-shutter is optional and off by default; when on, it waits 3 ready frames. **Relearn this side** clears the stored peak; learning itself is automatic.
+
+While still learning (no locked peak), prompts stay on the sweep intro — a 60° prior never fires TURN_BACK / HOLD. Absolute yaw is hidden in a debug disclosure; the normal UI does not show a target degree.
 
 ## Ceiling and shortfalls（上限与短板）
 
@@ -90,7 +94,7 @@ Numeric thresholds: **`src/config/pose-config.json`**. User-visible strings: **`
 
 | Want… | Touch |
 |--------|--------|
-| Search / preferred band | `search.yawAbsMin` / `yawAbsMax` / `preferredAbs*` |
+| Search / preferred band | `search.rightEar` / `search.leftEar` (`yawAbsMin` / `yawAbsMax` / `preferredAbs*`) |
 | READY vs personal peak | `ready.bandDegAroundBest`, `ready.scoreRatioOfBest` |
 | Less flicker | `promptUx.minDwellMs`, `crossFamilyDwellMs`, `smoothing.oneEuro` |
 | Sharpness floor | `score.sharp`, `score.struct` |
@@ -107,6 +111,7 @@ src/lib/personal-best.ts      running bestYaw from ROI quality
 src/lib/quality.ts            Laplacian / edges / weighted score
 docs/LIMITS.md                blockers, ceiling, next steps (EN)
 docs/LIMITS.zh-CN.md          卡点 / 上限 / 短板 / 后续
+docs/ear-guide-interaction-gaps.md  P0/P1 coverage checklist
 src/components/EarCaptureApp.tsx
 ```
 

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { PeakSample } from "../lib/personal-best";
 import { useLocale } from "../i18n";
 
@@ -13,10 +14,16 @@ export function AngleHud({
   bestYaw: PeakSample | null;
 }) {
   const { t } = useLocale();
+  const [open, setOpen] = useState(false);
   const fmt = (v: number | null) =>
     v === null || Number.isNaN(v) ? "—" : v.toFixed(1);
   return (
-    <div className="hud" aria-live="polite">
+    <details
+      className="hud"
+      open={open}
+      onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}
+    >
+      <summary>{t("debugHudSummary")}</summary>
       <span>
         yaw <strong>{fmt(yaw)}°</strong>
       </span>
@@ -32,6 +39,6 @@ export function AngleHud({
           {bestYaw ? `${bestYaw.yaw.toFixed(0)}°` : t("hudLearning")}
         </strong>
       </span>
-    </div>
+    </details>
   );
 }

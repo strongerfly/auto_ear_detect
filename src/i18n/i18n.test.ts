@@ -72,6 +72,10 @@ describe("string lookup", () => {
     expect(translate("en", "helpTitle")).toBe("Instructions");
     expect(translate("zh", "relearn")).toBe("重新学习此侧");
     expect(translate("en", "relearn")).toBe("Relearn this side");
+    expect(translate("zh", "otherEarHint")).toContain("另一只耳朵");
+    expect(translate("en", "otherEarHint").toLowerCase()).toContain("other ear");
+    expect(translate("zh", "FAIL_TIMEOUT")).toContain("拨开头发");
+    expect(translate("en", "FAIL_TIMEOUT").toLowerCase()).toContain("tuck hair");
   });
 
   it("keeps user-facing help and sweep copy free of rigid angle checklists", () => {

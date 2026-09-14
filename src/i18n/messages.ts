@@ -51,7 +51,11 @@ type UiMessageKey =
   | "helpStuckHeading"
   | "helpStuckBody"
   | "helpLimitsHeading"
-  | "helpLimitsBody";
+  | "helpLimitsBody"
+  | "debugHudSummary"
+  | "relearnConfirm"
+  | "autoshutterCancel"
+  | "otherEarHint";
 
 export type MessageKey = PromptKey | UiMessageKey;
 
@@ -128,13 +132,17 @@ const zh: Messages = {
   helpIntro: "语言切换在页头：中文 / English。",
   helpTurnHeading: "能做什么",
   helpTurnBody:
-    "用前置摄像头。先点「拍左耳」或「拍右耳」（身体的左右，不是镜子）。按提示慢慢转头，系统会记住这侧最清楚的角度。等到「可以拍了」再拍；默认开着自动快门，到点会自己拍。拍完一侧再换另一侧。",
+    "用前置摄像头。先点「拍左耳」或「拍右耳」（身体的左右，不是镜子）。按提示慢慢转头，系统会记住这侧最清楚的角度。等到「可以拍了」再拍。自动快门默认关着，打开后到点会自己拍。拍完一侧再换另一侧。",
   helpStuckHeading: "做不到",
   helpStuckBody:
     "不是医院耳镜。一次只拍一只耳朵，也不会检查你是不是点错了侧。头要大致摆正、稳住，脸在框里、距离合适。太暗或头发挡住会失败。只有侧着转头时才会学习——几乎正面或转到后脑勺都不算。预览像镜子，保存的照片不是。",
   helpLimitsHeading: "小提示",
   helpLimitsBody:
     "拨开头发，光线好一点，慢慢转、停一停。拍右耳 → 向左转头；拍左耳 → 向右转头。角度不对就点「重新学习此侧」。",
+  debugHudSummary: "调试角度（平时不用看）",
+  relearnConfirm: "重新找这一侧最清楚的角度？当前记录会清掉。",
+  autoshutterCancel: "自动拍摄中，点按可取消",
+  otherEarHint: "这侧拍好了，需要的话再拍另一只耳朵。",
 };
 
 const en: Messages = {
@@ -215,13 +223,18 @@ const en: Messages = {
   helpIntro: "Language switching is in the page header: 中文 / English.",
   helpTurnHeading: "Can",
   helpTurnBody:
-    "Use the front camera. Tap Left ear or Right ear first (your body, not the mirror). Turn slowly as prompted — the app remembers the clearest angle for that side. Shoot when it says Ready; auto-shutter is on by default and will take the shot. Then switch sides for the other ear.",
+    "Use the front camera. Tap Left ear or Right ear first (your body, not the mirror). Turn slowly as prompted — the app remembers the clearest angle for that side. Shoot when it says Ready. Auto-shutter is off by default; turn it on if you want the app to shoot for you. Then switch sides for the other ear.",
   helpStuckHeading: "Cannot",
   helpStuckBody:
     "Not a clinical ear scanner. One ear at a time, and it won’t check that you picked the correct side. Keep your head roughly upright and steady, face in frame, at a comfortable distance. Dark scenes or hair over the ear fail. It only learns while you turn to the side — not almost frontal, not past the back of the head. The preview is a mirror; the saved photo is not.",
   helpLimitsHeading: "Tips",
   helpLimitsBody:
     "Clear hair, use good light, turn slowly and pause. Right ear → turn your head left; left ear → turn your head right. If the angle is wrong, tap Relearn this side.",
+  debugHudSummary: "Debug angles (hidden during capture)",
+  relearnConfirm:
+    "Find the clearest angle for this side again? The current record will be cleared.",
+  autoshutterCancel: "Auto-capture in progress — tap to cancel",
+  otherEarHint: "This side is done — capture the other ear if you need it.",
 };
 
 const catalogs: Record<Locale, Messages> = { zh, en };
@@ -265,6 +278,8 @@ export function userFacingKeys(): MessageKey[] {
     "TURN_BACK_OVERSHOOT",
     "learningNote",
     "relearn",
+    "relearnConfirm",
+    "otherEarHint",
     "clickToStart",
     "helpStuckBody",
     "helpLimitsBody",

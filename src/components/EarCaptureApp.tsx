@@ -39,6 +39,7 @@ type LiveState = {
   roll: number | null;
   prompt: PromptKey;
   allowCapture: boolean;
+  phase: "learning" | "hold" | "ready";
   roi: RoiBox | null;
   quality: EarQuality | null;
   faceHeightRatio: number;
@@ -50,6 +51,7 @@ const INITIAL_LIVE: LiveState = {
   roll: null,
   prompt: "NO_FACE",
   allowCapture: false,
+  phase: "learning",
   roi: null,
   quality: null,
   faceHeightRatio: 0,
@@ -68,7 +70,7 @@ export function EarCaptureApp() {
 
   const [side, setSide] = useState<EarSide>("rightEar");
   const [bests, setBests] = useState<PersonalBestMap>(() => loadPersonalBests());
-  const [autoShutter, setAutoShutter] = useState(true);
+  const [autoShutter, setAutoShutter] = useState(false);
   const [lastCapture, setLastCapture] = useState<string | null>(null);
   const [sim, setSim] = useState<SimState>(DEFAULT_SIM);
   const [live, setLive] = useState<LiveState>(INITIAL_LIVE);
@@ -87,6 +89,8 @@ export function EarCaptureApp() {
   const readyBurst = useRef(0);
   const hadTrackedFace = useRef(false);
   const searchStartedAt = useRef<number | null>(null);
+  const wasPoseReady = useRef(false);
+  const shutterCancel = useRef(false);
 
   sideRef.current = side;
   bestsRef.current = bests;
@@ -349,6 +353,7 @@ export function EarCaptureApp() {
             searchStartedAt.current === null
               ? 0
               : now - searchStartedAt.current,
+          wasPoseReady: wasPoseReady.current,
         },
       );
 
@@ -360,16 +365,20 @@ export function EarCaptureApp() {
       );
       const shown = dwellRef.current.displayed ?? guidance.prompt;
 
+      wasPoseReady.current = guidance.poseReady;
+
       if (guidance.allowCapture) {
         readyBurst.current += 1;
       } else {
         readyBurst.current = 0;
+        shutterCancel.current = false;
       }
 
       if (
         guidance.allowCapture &&
         autoShutterRef.current &&
         !shutterLatch.current &&
+        !shutterCancel.current &&
         readyBurst.current >= poseConfig.ready.burstFrames
       ) {
         shutterLatch.current = true;
@@ -385,6 +394,7 @@ export function EarCaptureApp() {
         roll,
         prompt: shown,
         allowCapture: guidance.allowCapture,
+        phase: guidance.phase,
         roi,
         quality,
         faceHeightRatio: heightRatio,
@@ -396,11 +406,13 @@ export function EarCaptureApp() {
   }, [landmarker, videoRef]);
 
   const recalibrateSide = () => {
+    if (!window.confirm(t("relearnConfirm"))) return;
     const next = { ...bests, [side]: null };
     bestsRef.current = next;
     setBests(next);
     savePersonalBests(next);
     searchStartedAt.current = null;
+    wasPoseReady.current = false;
   };
 
   const downloadCapture = () => {
@@ -412,15 +424,16 @@ export function EarCaptureApp() {
     a.click();
   };
 
+  const cameraDenied =
+    camError === "NotAllowedError" || camError === "NotFoundError";
+
   const stageHint = useMemo(() => {
     if (sim.enabled) return t("simMode");
-    if (camError === "NotAllowedError" || camError === "NotFoundError") {
-      return t("cameraDenied");
-    }
+    if (cameraDenied) return t("cameraDenied");
     if (camError) return t("cameraError", { error: camError });
     if (!camReady) return t("cameraOff");
     return t("previewHint");
-  }, [camError, camReady, sim.enabled, t]);
+  }, [camError, camReady, cameraDenied, sim.enabled, t]);
 
   return (
     <div className="app" data-locale={locale}>
@@ -470,6 +483,14 @@ export function EarCaptureApp() {
           {promptText}
         </div>
         <span className="stage-tag">{stageHint}</span>
+        {cameraDenied ? (
+          <div className="stage-empty" role="status">
+            <p>{t("cameraDenied")}</p>
+            <button type="button" className="ghost" onClick={() => void start()}>
+              {t("openCamera")}
+            </button>
+          </div>
+        ) : null}
       </section>
 
       <AngleHud
@@ -490,6 +511,13 @@ export function EarCaptureApp() {
           type="button"
           className="capture"
           disabled={!live.allowCapture}
+          title={
+            live.allowCapture
+              ? t("READY")
+              : live.phase === "hold"
+                ? t("HOLD_NEAR_PEAK")
+                : t(side === "rightEar" ? "SWEEP_RIGHT_EAR" : "SWEEP_LEFT_EAR")
+          }
           onClick={captureStill}
         >
           {t("capture")}
@@ -498,10 +526,25 @@ export function EarCaptureApp() {
           <input
             type="checkbox"
             checked={autoShutter}
-            onChange={(e) => setAutoShutter(e.target.checked)}
+            onChange={(e) => {
+              setAutoShutter(e.target.checked);
+              shutterCancel.current = false;
+            }}
           />
           {t("autoShutter")}
         </label>
+        {autoShutter && live.allowCapture ? (
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => {
+              shutterCancel.current = true;
+              setAutoShutter(false);
+            }}
+          >
+            {t("autoshutterCancel")}
+          </button>
+        ) : null}
         <button
           type="button"
           className="ghost"
@@ -523,7 +566,9 @@ export function EarCaptureApp() {
 
       {lastCapture ? (
         <figure className="preview">
-          <figcaption>{t("lastCaptureCaption")}</figcaption>
+          <figcaption>
+            {t("lastCaptureCaption")} · {t("otherEarHint")}
+          </figcaption>
           <img src={lastCapture} alt={t("lastCaptureAlt")} />
         </figure>
       ) : null}

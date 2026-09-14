@@ -31,6 +31,7 @@ export type GuidanceExtras = {
   yawDelta?: number;
   hadTrackedFace?: boolean;
   searchElapsedMs?: number;
+  wasPoseReady?: boolean;
 };
 
 export type GuidanceResult = {
@@ -40,31 +41,37 @@ export type GuidanceResult = {
   qualityKind: QualityKind;
   targets: EffectiveTargets;
   allowCapture: boolean;
+  phase: "learning" | "hold" | "ready";
 };
 
-/** Progressive yaw hints relative to personal best (or the soft prior). */
+/** Progressive yaw hints. Unlocked = sweep only; TURN_BACK only after a peak. */
 function pickYawPrompt(
   yaw: number,
   t: EffectiveTargets,
   yawDelta: number,
   config: PoseConfig,
+  wasReady: boolean,
 ): PromptKey | null {
   if (t.side === "rightEar" && yaw < -8) return "WRONG_SIDE";
   if (t.side === "leftEar" && yaw > 8) return "WRONG_SIDE";
 
-  if (Math.abs(yaw) >= config.failure.stuckNearOuterEdgeDeg) {
-    return "TURN_BACK_OVERSHOOT";
+  if (yawDelta >= config.search.slowYawDeltaDeg) {
+    return "SLOW_DOWN";
+  }
+
+  if (!t.locked) {
+    return t.side === "rightEar" ? "SWEEP_RIGHT_EAR" : "SWEEP_LEFT_EAR";
   }
 
   const err = yaw - t.yawCenter;
   const abs = Math.abs(err);
-  if (abs <= t.fineAbsError) return null;
+  const inBand = wasReady
+    ? abs <= (config.ready.exitBandDeg ?? t.fineAbsError)
+    : abs <= t.fineAbsError;
+  if (inBand) return null;
 
-  if (
-    yawDelta >= config.search.slowYawDeltaDeg &&
-    abs > t.fineAbsError
-  ) {
-    return "SLOW_DOWN";
+  if (Math.abs(yaw) >= config.failure.stuckNearOuterEdgeDeg) {
+    return "TURN_BACK_OVERSHOOT";
   }
 
   if (t.side === "rightEar") {
@@ -96,6 +103,7 @@ export function pickPrompt(
     input.roll,
     targets,
     config,
+    extras.wasPoseReady ?? false,
   );
   const stable = stableFrames >= config.ready.stableFrames;
   const peak =
@@ -116,6 +124,7 @@ export function pickPrompt(
     qualityKind,
     targets,
     allowCapture: false,
+    phase: targets.locked ? "hold" : "learning",
   };
 
   if (
@@ -167,6 +176,7 @@ export function pickPrompt(
     targets,
     extras.yawDelta ?? 0,
     config,
+    extras.wasPoseReady ?? false,
   );
   if (yawHint) {
     return { ...fail, prompt: yawHint, poseNear: false, poseReady: false };
@@ -194,9 +204,17 @@ export function pickPrompt(
   const allowCapture =
     poseReady && stable && qualityKind === "ok" && nearPeakScore;
   if (allowCapture) {
-    return { ...fail, prompt: "READY", allowCapture: true };
+    return { ...fail, prompt: "READY", allowCapture: true, phase: "ready" };
   }
-  return { ...fail, prompt: "HOLD_NEAR_PEAK" };
+  if (!targets.locked) {
+    return {
+      ...fail,
+      prompt:
+        targets.side === "rightEar" ? "SWEEP_RIGHT_EAR" : "SWEEP_LEFT_EAR",
+      phase: "learning",
+    };
+  }
+  return { ...fail, prompt: "HOLD_NEAR_PEAK", phase: "hold" };
 }
 
 export function evaluateGuidance(
