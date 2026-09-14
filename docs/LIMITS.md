@@ -56,7 +56,7 @@ User-facing strings live in `src/i18n/`. Unlocked prompts do not steer `TURN_MOR
 5. Ear score ≥ **92%** of the side’s peak; brightness 60–200  
 6. No yaw ∈ [70, 90] requirement; no user confirm  
 
-Guidance is one short line (中文 / English in the app). Switching left/right resets shutter, dwell, and guidance and shows a body-side intro; the other side’s stored peak is kept. While the peak is still unknown we only **sweep** (no prior-driven “a little more / ease back”). `SLOW_DOWN` can preempt a sweep line on a fast yaw jump, then yields back to SWEEP on a short window (`slowDownHoldMs`=200, same idea as READY’s `readyPromoteMs`) so 「转慢一点」 does not sit for a full yaw-family `minDwellMs`. After lock, going past `bestYaw` by `overshootPastBestDeg` with a score drop says ease back; returning toward best is HOLD, not MORE. Near a locked peak but not yet stable the shutter stays grey and uses **NEAR_PEAK** (「快到了…」), never **HOLD_STILL**. READY hysteresis: enter ±5° / leave ±8°. Auto-shutter is a cancelable `autoshutterMs` countdown after Ready. After a shot, feedback is relative to the remembered peak (no absolute degrees), with retake / other ear. Absolute yaw/pitch/roll numbers stay behind a debug toggle.
+Guidance is one short line (中文 / English in the app). Cold start requires choosing a body left/right ear (not the screen) before INTRO; the pick is stored. Switching left/right still calls the side-session reset (shutter, dwell, intro) and keeps the other side’s stored peak. While the peak is still unknown we only **sweep** (no prior-driven “a little more / ease back”). `SLOW_DOWN` can preempt a sweep line on a fast yaw jump, then yields back to SWEEP on a short window (`slowDownHoldMs`=200, same idea as READY’s `readyPromoteMs`) so 「转慢一点」 does not sit for a full yaw-family `minDwellMs`. After lock, going past `bestYaw` by `overshootPastBestDeg` with a score drop says ease back; returning toward best is HOLD, not MORE. Near a locked peak but not yet stable the shutter stays grey and uses **NEAR_PEAK** (「快到了…」), never **HOLD_STILL**. READY hysteresis: enter ±5° / leave ±8°. Auto-shutter is a cancelable `autoshutterMs` countdown after Ready. After a shot, feedback is relative to the remembered peak (no absolute degrees), with retake / other ear. Absolute yaw/pitch/roll numbers stay behind a debug toggle.
 
 ## Cannot-do + breakthrough conditions (1–8)
 
@@ -94,8 +94,8 @@ To break through: An attributable quality head or segmentation.
 
 ## Next cuts within the ceiling (shippable; not items 1–8 above)
 - #7 string-key alignment landed
-- First-run side pick
+- First-run side pick landed
 - More-perceptible soft-success
 - Copy polish after simulator defaults to collapsed (simulator default collapsed already done)
 
-Note: Items 1–8 are documentation-only (no implementation tickets). In “next cuts,” the #7 string-key alignment is already on main; the other three eng tickets (first-run side pick / more-perceptible soft-success / simulator copy polish) are owned by the lead and sequenced A→B→C.
+Note: Items 1–8 are documentation-only (no implementation tickets). In “next cuts,” #7 string-key alignment and first-run side pick have landed; the remaining eng tickets (more-perceptible soft-success / simulator copy polish) are owned by the lead and sequenced B→C.

@@ -26,6 +26,7 @@ export type PromptKey =
   | "READY"
   | "INTRO_LEFT"
   | "INTRO_RIGHT"
+  | "PICK_SIDE"
   | "STUCK_NO_PROGRESS"
   | "SOFT_READY"
   | "EAR_OUT_OF_FRAME";
@@ -58,6 +59,7 @@ export const PROMPT_KEYS: PromptKey[] = [
   "READY",
   "INTRO_LEFT",
   "INTRO_RIGHT",
+  "PICK_SIDE",
   "STUCK_NO_PROGRESS",
   "SOFT_READY",
   "EAR_OUT_OF_FRAME",

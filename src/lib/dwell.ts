@@ -33,7 +33,8 @@ type Family =
   | "quality"
   | "hold"
   | "ready"
-  | "stuck";
+  | "stuck"
+  | "pick";
 
 function familyOf(prompt: PromptKey): Family {
   switch (prompt) {
@@ -48,6 +49,8 @@ function familyOf(prompt: PromptKey): Family {
     case "PITCH_DOWN":
     case "PITCH_UP":
       return "pose";
+    case "PICK_SIDE":
+      return "pick";
     case "INTRO_LEFT":
     case "INTRO_RIGHT":
     case "SWEEP_RIGHT_EAR":

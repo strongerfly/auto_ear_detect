@@ -95,6 +95,7 @@ const zh: Messages = {
   READY: "可以拍了",
   INTRO_LEFT: "现在拍左耳（身体的左耳，不是镜子）。慢慢向右转。",
   INTRO_RIGHT: "现在拍右耳（身体的右耳，不是镜子）。慢慢向左转。",
+  PICK_SIDE: "先选要拍哪只耳朵（身体的左/右，不是屏幕或镜子）",
   STUCK_NO_PROGRESS:
     "这侧一直没更清楚。拨开头发、换亮一点，或重新学习后再慢慢转。",
   SOFT_READY: "这是这侧目前最清楚的角度，可以拍；看起来不对就重新学习。",
@@ -121,7 +122,8 @@ const zh: Messages = {
   lastCaptureAlt: "刚拍好的耳部照片",
   footer: "左右指身体的左右。预览像镜子，保存的照片不是。",
   loadingLandmarker: "正在加载 Face Landmarker…",
-  clickToStart: "点「打开摄像头」开始。慢慢转，找到耳朵最清楚的角度。",
+  clickToStart:
+    "先选左耳或右耳（身体的左右，不是镜子），再点「打开摄像头」。慢慢转，找到耳朵最清楚的角度。",
   modelLoadFailed: "模型加载失败：{error}。仍可用姿态模拟器。",
   simMode: "模拟模式",
   cameraError: "摄像头：{error}",
@@ -160,7 +162,7 @@ const zh: Messages = {
   helpIntro: "语言切换在页头：中文 / English。",
   helpTurnHeading: "怎么转",
   helpTurnBody:
-    "用前置摄像头。先点「拍左耳」或「拍右耳」（身体的左右，不是镜子）。切换左右会重新引导这一侧，另一侧记住的角度还在。拍右耳 → 向左转头；拍左耳 → 向右转头。转的是头，不是电脑或手机。跟着提示走，不要对着镜子反着学。按提示慢慢转头，系统会记住这侧最清楚的角度。\n\n转过头很正常：「往回一点」是朝刚才更清楚的那边转回去，别继续转到后脑勺。转到头了会说「到头了，往回一点」。往回走时先稳住，不要再转更侧。转太快会提示「转慢一点」。\n\n提示「方向反了」是转头方向反了，不是点错了左/右。框在另一只耳朵上时，点另一侧按钮，系统不会自己换。拍完一侧，接着拍另一侧：再点另一侧重转。等到「可以拍了」再拍；默认开着自动快门，倒计时出现时可点「取消自动拍摄」。拍完可重拍或换另一只耳。",
+    "用前置摄像头。第一次先选「拍左耳」或「拍右耳」（身体的左右，不是镜子）；选过会记住，没选之前不能拍。切换左右会重新引导这一侧，另一侧记住的角度还在。拍右耳 → 向左转头；拍左耳 → 向右转头。转的是头，不是电脑或手机。跟着提示走，不要对着镜子反着学。按提示慢慢转头，系统会记住这侧最清楚的角度。\n\n转过头很正常：「往回一点」是朝刚才更清楚的那边转回去，别继续转到后脑勺。转到头了会说「到头了，往回一点」。往回走时先稳住，不要再转更侧。转太快会提示「转慢一点」。\n\n提示「方向反了」是转头方向反了，不是点错了左/右。框在另一只耳朵上时，点另一侧按钮，系统不会自己换。拍完一侧，接着拍另一侧：再点另一侧重转。等到「可以拍了」再拍；默认开着自动快门，倒计时出现时可点「取消自动拍摄」。拍完可重拍或换另一只耳。",
   helpStuckHeading: "拍不了的时候",
   helpStuckBody:
     "第一次要慢慢转过，系统才会记住这一侧。拍摄按钮是灰的，常见有两种原因：还没学完这一侧；或者已经记住了但还没对准最清楚的角度（提示「快到了」）。等到「可以拍了」才能点。默认开着自动快门，出现「可以拍了」会倒计时，需要的话点「取消自动拍摄」。\n\n摄像头被拒：到浏览器设置里允许这个网站使用摄像头。头发挡住、糊了或反光：拨开头发（糊了或反光也先试试），换亮一点。转了很久仍没更清楚时，会出现「再试一次 / 重新学习 / 拨开头发换亮一点」，不会只留一个灰色快门。\n\n换了发型或眼镜、角度记错、一直出不了「可以拍了」：点「重新学习此侧」（再确认一次，只清这一侧记住的角度），再慢慢转一次。误点确认的话，拍不了，直到重新学会。",
@@ -199,6 +201,8 @@ const en: Messages = {
     "Now the left ear (your body, not the mirror). Turn slowly right.",
   INTRO_RIGHT:
     "Now the right ear (your body, not the mirror). Turn slowly left.",
+  PICK_SIDE:
+    "Choose which ear to capture first (your body’s left/right, not the screen)",
   STUCK_NO_PROGRESS:
     "This side isn’t getting clearer. Tuck hair, find better light, or tap Relearn and turn slowly again.",
   SOFT_READY:
@@ -230,7 +234,7 @@ const en: Messages = {
     "Left/right means your body, not the screen. Preview is a mirror; saved photos are not.",
   loadingLandmarker: "Loading Face Landmarker…",
   clickToStart:
-    "Click “Open camera” to begin. Turn slowly until the ear looks clearest.",
+    "Choose left or right ear first (your body, not the screen), then click “Open camera” to begin. Turn slowly until the ear looks clearest.",
   modelLoadFailed:
     "Model failed to load: {error}. You can still use the pose simulator.",
   simMode: "Simulator mode",
@@ -271,7 +275,7 @@ const en: Messages = {
   helpIntro: "Language switching is in the page header: 中文 / English.",
   helpTurnHeading: "How to turn",
   helpTurnBody:
-    "Use the front camera. Tap Left ear or Right ear first (your body, not the mirror). Switching sides restarts guidance for that ear and keeps the other side’s remembered angle. Right ear → turn your head left; left ear → turn your head right. Turn your head, not the laptop or phone. Follow the prompt; don’t copy the mirror. Turn slowly as prompted — the app remembers the clearest angle for that side.\n\nOvershoot is normal: “ease back” means toward the clearer pose, not past the back of your head. At the far edge you’ll see “that’s as far as it goes — ease back.” While you return, hold; don’t keep turning farther. If you turn too fast, it asks you to slow down.\n\n“Other way” is the turn direction, not the wrong ear tab. If the box is on the other ear, tap the other side — the app won’t switch for you. After one ear, tap the other side and turn again. Shoot when it says Ready; auto-shutter is on by default and shows a countdown you can cancel. After a shot you can retake or switch ears.",
+    "Use the front camera. The first time, choose Left ear or Right ear (your body, not the mirror); that choice is remembered, and capture stays off until you pick a side. Switching sides restarts guidance for that ear and keeps the other side’s remembered angle. Right ear → turn your head left; left ear → turn your head right. Turn your head, not the laptop or phone. Follow the prompt; don’t copy the mirror. Turn slowly as prompted — the app remembers the clearest angle for that side.\n\nOvershoot is normal: “ease back” means toward the clearer pose, not past the back of your head. At the far edge you’ll see “that’s as far as it goes — ease back.” While you return, hold; don’t keep turning farther. If you turn too fast, it asks you to slow down.\n\n“Other way” is the turn direction, not the wrong ear tab. If the box is on the other ear, tap the other side — the app won’t switch for you. After one ear, tap the other side and turn again. Shoot when it says Ready; auto-shutter is on by default and shows a countdown you can cancel. After a shot you can retake or switch ears.",
   helpStuckHeading: "If it won’t capture",
   helpStuckBody:
     "The first time, capture stays off until you’ve slowly swept so the app can learn that side — the button stays grey. It also stays grey after a peak is remembered if you’re not yet on the clearest pose (you’ll see Almost there). You can tap Capture only when it says Ready. Auto-shutter is on by default and starts a countdown then — tap Cancel auto-capture if you need to stop it.\n\nCamera denied: allow this site in your browser settings. Hair, blur, or glare: tuck hair aside (try this for blur or shine too) and find better light. If nothing gets clearer for a while, you’ll get Try again / Relearn / tuck hair and find better light — not a dead grey shutter.\n\nWrong lock, new glasses or haircut, or you never reach Ready: tap Relearn this side (confirm once; clears this side only) and turn slowly again. An accidental tap to confirm blocks capture until that side is relearned.",
@@ -342,6 +346,7 @@ export function userFacingKeys(): MessageKey[] {
     "cancelAutoShutter",
     "INTRO_LEFT",
     "INTRO_RIGHT",
+    "PICK_SIDE",
     "STUCK_NO_PROGRESS",
     "SOFT_READY",
     "EAR_OUT_OF_FRAME",
