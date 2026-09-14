@@ -8,6 +8,8 @@ export type EarQuality = {
   laplacian: number;
   brightness: number;
   edgeEnergy: number;
+  /** Mean luma of the ROI center (meatus-like dark-blob cue). */
+  centerBrightness?: number;
 };
 
 export type RoiBox = {

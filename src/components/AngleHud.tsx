@@ -1,18 +1,15 @@
-import type { PromptKey } from "../config";
-import { poseConfig } from "../config";
+import type { PeakSample } from "../lib/personal-best";
 
 export function AngleHud({
   yaw,
   pitch,
   roll,
-  offset,
-  prompt,
+  bestYaw,
 }: {
   yaw: number | null;
   pitch: number | null;
   roll: number | null;
-  offset: number;
-  prompt: PromptKey | null;
+  bestYaw: PeakSample | null;
 }) {
   const fmt = (v: number | null) =>
     v === null || Number.isNaN(v) ? "—" : v.toFixed(1);
@@ -28,11 +25,8 @@ export function AngleHud({
         roll <strong>{fmt(roll)}°</strong>
       </span>
       <span>
-        偏移 <strong>{offset >= 0 ? "+" : ""}{offset.toFixed(1)}°</strong>
+        最佳 <strong>{bestYaw ? `${bestYaw.yaw.toFixed(0)}°` : "学习中"}</strong>
       </span>
-      {prompt ? (
-        <span className="hud-state">{poseConfig.copy[prompt]}</span>
-      ) : null}
     </div>
   );
 }

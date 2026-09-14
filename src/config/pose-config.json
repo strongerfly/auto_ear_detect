@@ -1,5 +1,6 @@
 {
-  "version": 1,
+  "version": 2,
+  "captureMode": "qualityPeakYaw",
   "coordinateConvention": {
     "yawPositive": "rightEarVisible",
     "note": "FISWG: +yaw 露右耳，-yaw 露左耳。实现时用真机标定矩阵→Euler 符号，使与此一致。",
@@ -16,64 +17,93 @@
     "minFaceHeightRatio": 0.25,
     "maxFaceHeightRatio": 0.70
   },
-  "poseTargets": {
-    "rightEar": {
-      "yawCenter": 80, "yawMin": 70, "yawMax": 90,
-      "pitchMin": -8, "pitchMax": 8, "rollMin": -8, "rollMax": 8
+  "search": {
+    "yawAbsMin": 35,
+    "yawAbsMax": 90,
+    "preferredAbsMin": 40,
+    "preferredAbsMax": 80,
+    "priorYawAbs": 60,
+    "pitchMin": -10,
+    "pitchMax": 10,
+    "rollMin": -8,
+    "rollMax": 8,
+    "minSweepCoverageRatio": 0.6,
+    "allowResweepOnce": true,
+    "tieBreak": "smallerAbsYaw",
+    "guidanceCoarseAbsError": 22,
+    "slowYawDeltaDeg": 18
+  },
+  "score": {
+    "weights": { "sharp": 0.45, "struct": 0.35, "content": 0.20 },
+    "sharp": { "laplacianMinRaw": 80, "laplacianGoodRaw": 120 },
+    "struct": { "minEdgeEnergy": 15, "goodEdgeEnergy": 40 },
+    "content": {
+      "requireSideFaceProxy": true,
+      "penalizeMeatusLikeDarkBlob": true,
+      "meatusPenalty": 0.25,
+      "meatusCenterBrightnessBelow": 40,
+      "outsidePreferredSoftPenalty": 0.1
     },
-    "leftEar": {
-      "yawCenter": -80, "yawMin": -90, "yawMax": -70,
-      "pitchMin": -8, "pitchMax": 8, "rollMin": -8, "rollMax": 8
-    }
+    "scoreMinAbsolute": 0.35,
+    "updateBestOnlyIfPoseOk": true,
+    "ignoreFrameIfFaceLost": true
+  },
+  "ready": {
+    "bandDegAroundBest": 5,
+    "scoreRatioOfBest": 0.92,
+    "stableFrames": 12,
+    "maxDeltaYawDeg": 3,
+    "maxDeltaPitchDeg": 3,
+    "maxDeltaRollDeg": 3,
+    "brightnessMin": 60,
+    "brightnessMax": 200,
+    "burstFrames": 3,
+    "pickBurstBy": "score",
+    "requireUserConfirm": false,
+    "pitchMaxAbs": 10,
+    "rollMaxAbs": 8
+  },
+  "personalBest": {
+    "persist": true,
+    "alwaysRescore": true,
+    "nextTimeNarrowSearchByDeg": 10,
+    "minScoreImprove": 0.02
   },
   "poseGuidance": {
     "rollCorrectAbove": 12,
+    "rollSevereAbove": 20,
     "pitchTooHighAbove": 12,
-    "pitchTooLowBelow": -12,
-    "rightEar": { "turnMoreBelow": 55, "almostBelow": 70, "tooFarAbove": 95 },
-    "leftEar": { "turnMoreAbove": -55, "almostAbove": -70, "tooFarBelow": -95 }
+    "pitchTooLowBelow": -12
   },
-  "captureBands": {
-    "nearMaxAbsYawError": 10,
-    "readyMaxAbsYawError": 5,
-    "readyMaxAbsPitchError": 8,
-    "readyMaxAbsRollError": 8
+  "promptUx": {
+    "minDwellMs": 400,
+    "crossFamilyDwellMs": 700,
+    "readyPromoteMs": 200,
+    "onlyOnePrompt": true
   },
-  "personalOffset": {
-    "enabled": true,
-    "clampDeg": 15,
-    "calibrationYawMinAbs": 60,
-    "calibrationYawMaxAbs": 95,
-    "defaultOffset": { "leftEar": 0, "rightEar": 0 }
+  "failure": {
+    "stuckNearInnerEdgeDeg": 38,
+    "stuckNearOuterEdgeDeg": 88,
+    "lowStructAcrossSweep": 12,
+    "flatPeakRangeDeg": 25,
+    "timeoutMs": 45000,
+    "maxFaceLostFrames": 15
   },
-  "stability": {
-    "requiredStableFrames": 12,
-    "maxDeltaYawDeg": 3,
-    "maxDeltaPitchDeg": 3,
-    "maxDeltaRollDeg": 3
-  },
-  "earRoiQuality": {
-    "laplacianMin": 100,
-    "brightnessMin": 60,
-    "brightnessMax": 200,
-    "minEdgeEnergy": 15
-  },
-  "promptUx": { "minDwellMs": 400, "onlyOnePrompt": true },
   "copy": {
     "NO_FACE": "请把脸移入取景框",
     "TOO_FAR": "请靠近一点",
-    "TOO_CLOSE": "请稍远一点",
-    "FIX_ROLL": "请摆正脑袋，不要歪头",
-    "PITCH_DOWN": "请稍微低头",
-    "PITCH_UP": "请稍微抬头",
-    "TURN_LEFT": "请向左转头，露出右耳",
-    "TURN_LEFT_MORE": "再向左转一点",
-    "TURN_LEFT_BACK": "转得有点过了，往回一点",
-    "TURN_RIGHT": "请向右转头，露出左耳",
-    "TURN_RIGHT_MORE": "再向右转一点",
-    "TURN_RIGHT_BACK": "转得有点过了，往回一点",
-    "CLEAR_HAIR": "请把耳边头发拨开",
-    "HOLD_STILL": "很好，请保持不动",
+    "TOO_CLOSE": "请稍远一点，露出整只耳朵",
+    "FIX_ROLL": "头摆正一点",
+    "PITCH_DOWN": "稍微低头",
+    "PITCH_UP": "稍微抬头",
+    "SWEEP_RIGHT_EAR": "向左转头，慢慢找右耳最清楚的角度",
+    "SWEEP_LEFT_EAR": "向右转头，慢慢找左耳最清楚的角度",
+    "TURN_MORE": "再转一点点",
+    "TURN_BACK": "往回一点",
+    "SLOW_DOWN": "转慢一点",
+    "WRONG_SIDE": "方向反了，按提示的方向转",
+    "CLEAR_HAIR": "拨开耳边头发",
+    "HOLD_STILL": "很好，保持不动",
     "BAD_LIGHT": "光线不太好，换亮一点的地方",
     "READY": "可以拍了"
   }

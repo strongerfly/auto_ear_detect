@@ -2,9 +2,11 @@
 
 [![CI](https://github.com/strongerfly/auto_ear_detect/actions/workflows/ci.yml/badge.svg)](https://github.com/strongerfly/auto_ear_detect/actions/workflows/ci.yml)
 
-Real-time **head-pose guided ear capture**. The webcam + MediaPipe Face Landmarker estimate yaw / pitch / roll, Chinese on-screen copy tells the user how to turn, and capture is gated until a frontal view of the chosen ear is stable and sharp.
+Real-time **head-pose guided ear capture**. MediaPipe Face Landmarker estimates yaw / pitch / roll. On-screen copy (Chinese) tells the user which way to turn. Capture is gated by a **quality-adaptive personal best yaw**, not a universal 70–90° band.
 
 Stack: **Vite + React + TypeScript** + `@mediapipe/tasks-vision` Face Landmarker (`VIDEO` mode, `outputFacialTransformationMatrixes: true`).
+
+Limits, blockers, and what we will not pretend to solve: **[docs/LIMITS.md](docs/LIMITS.md)** · **[docs/LIMITS.zh-CN.md](docs/LIMITS.zh-CN.md)**.
 
 ## Run
 
@@ -25,6 +27,8 @@ GitHub Actions (`.github/workflows/ci.yml`) runs `npm ci`, `npm test`, and `npm 
 
 No API keys. The Face Landmarker WASM loads from jsDelivr; the `.task` model is served from `public/models/` when present, otherwise Google’s MediaPipe model host.
 
+This repo has **no i18n tree**. UI copy is Chinese in `src/config/pose-config.json`; English lives in the README and `docs/LIMITS.md`.
+
 ## Left / right convention (FISWG)
 
 | Sign | Meaning |
@@ -36,10 +40,7 @@ No API keys. The Face Landmarker WASM loads from jsDelivr; the `.task` model is 
 
 Euler order is **YXZ** (intrinsic `R = Ry · Rx · Rz`), units **degrees**. The 4×4 facial transformation matrix is treated as **row-major**. MediaPipe’s metric face has +X = subject’s right, +Y = up, +Z = toward the camera. Under that axis set, a positive raw Ry shows the *left* ear, so the implementation **negates yaw** (`FISWG_YAW_SIGN = -1` in `src/lib/euler.ts`) to match FISWG. Pitch and roll are not flipped.
 
-Default targets (also in `src/config/pose-config.json`):
-
-- Right ear: yaw **70–90°** (center 80), \|pitch\|≤8, \|roll\|≤8
-- Left ear: yaw **−90–−70°** (center −80), same pitch/roll
+Soft prior (not a capture gate): about **±60°**, preferred search **40–80°**, full search **35–90°**. A clear ear that peaks near **45°** can READY.
 
 ## Front-camera / mirror caveat
 
@@ -48,54 +49,55 @@ Default targets (also in `src/config/pose-config.json`):
 1. The `<video>` (and overlay canvas) use `transform: scaleX(-1)` so a front camera feels like a mirror.
 2. Face Landmarker runs on the **raw, unmirrored** `HTMLVideoElement` buffer. CSS does not change those pixels.
 3. Saved stills are drawn from that unmirrored buffer, so anatomical left/right in the file match FISWG.
-4. Guidance copy (`请向左转头，露出右耳`) refers to the user’s **physical** left/right, not screen-left.
+4. Guidance copy refers to the user’s **physical** left/right, not screen-left.
 
 **Do not also negate yaw** to “compensate” for the CSS mirror — that would double-correct and swap sides.
 
-If you instead draw a mirrored canvas and run Face Landmarker on *that*, MediaPipe’s left/right landmarks swap. You would then need to **negate yaw and swap ear ROI indices**. This project deliberately avoids that path.
+## Capture (qualityPeakYaw)
 
-## Capture gates
+Head pose is for **direction** and side. Ready-to-shoot is **ear frontal quality** for this person.
 
-Ready (button enabled + optional auto-shutter) only when all of:
+While the user turns, each side stores `bestYaw` = yaw at the highest ear-ROI score in \|yaw\| **35–90°** (sign matches the chosen ear). Score = 0.45 Laplacian + 0.35 edge energy + 0.20 side-face content (preferred 40–80 is a **soft** −0.1, never a refusal). Near-ties prefer the **smaller \|yaw\|**.
+
+READY when all of:
 
 1. Face present, size in `[minFaceHeightRatio, maxFaceHeightRatio]`
-2. Pose in the **ready** band around the offset-adjusted yaw center (`readyMaxAbsYawError` 5°, pitch/roll 8°)
-3. Stable for **12** frames with \|Δangle\| &lt; 3° on yaw, pitch, and roll
-4. Ear ROI quality: Laplacian ≥ 100, brightness 60–200, Sobel edge energy ≥ 15
+2. A personal **bestYaw** is locked for this side
+3. Current yaw within **±5°** of that best; pitch/roll inside ready limits
+4. Stable ~**12** frames (\|Δangle\| &lt; 3°)
+5. Score ≥ **92%** of the personal peak, brightness 60–200
 
-Guidance is a single Chinese line with **400 ms** dwell (anti-flicker). Priority:
+Sitting in 70–90° with generic “ok” quality is **not** enough if the peak is elsewhere, or if no peak is locked yet. No “confirm the ear is frontal” step. Auto-shutter waits 3 ready frames and shoots; the button is available as soon as READY.
 
-`NO_FACE` → distance → roll → pitch → yaw turn hints → hair/blur (`CLEAR_HAIR`) / light (`BAD_LIGHT`) → `HOLD_STILL` → `READY`
+Guidance is one short line. Far from the peak we only say which way to turn (sweep / a bit more / come back). Hair, light, and mild roll wait until the user is close. Dwell is 400 ms in-family, 700 ms across families, **200 ms** to promote READY.
 
-## Personal yaw offset
-
-Some ears sit at a slightly different profile angle. A per-side offset (clamped ±15°) is stored in `localStorage` key `auto-ear-detect:offset:v1`.
-
-**校准此侧偏移**: slowly turn while \|yaw\| is in 60–95°. The yaw at peak ear-ROI Laplacian becomes `offset = clamp(yawPeak − yawCenter, −15, 15)`. The yaw target band and turn-hint thresholds are translated by that offset, then clamped to a plausible profile range (~50–100° or −100–−50°).
+**重新学习** clears the stored peak. Learning itself is automatic.
 
 ## Tuning
 
-All numeric thresholds and Chinese strings live in **`src/config/pose-config.json`**. Restart/refresh after edits.
+Thresholds and Chinese strings: **`src/config/pose-config.json`**. Refresh after edits.
 
 | Want… | Touch |
 |--------|--------|
-| Stricter “ready” | `captureBands.readyMaxAbsYawError` |
-| Less flicker | `promptUx.minDwellMs`, `smoothing.oneEuro` |
-| Harder sharpness gate | `earRoiQuality.laplacianMin` / `minEdgeEnergy` |
-| Different copy | `copy.*` |
-
-Smoothing is a One Euro filter (`minCutoff` 1.0, `beta` 0.007, `dCutoff` 1.0).
+| Search / preferred band | `search.yawAbsMin` / `yawAbsMax` / `preferredAbs*` |
+| READY vs personal peak | `ready.bandDegAroundBest`, `ready.scoreRatioOfBest` |
+| Less flicker | `promptUx.minDwellMs`, `crossFamilyDwellMs`, `smoothing.oneEuro` |
+| Sharpness floor | `score.sharp`, `score.struct` |
+| Copy | `copy.*` |
 
 ## Project layout
 
 ```
-src/config/pose-config.json   thresholds + Chinese copy
+src/config/pose-config.json   qualityPeakYaw thresholds + Chinese copy
 src/lib/euler.ts              matrix → YXZ → FISWG signs
-src/lib/guidance.ts           pickPrompt state machine
-src/lib/quality.ts            Laplacian / brightness / edges
+src/lib/guidance.ts           progressive prompts + READY gate
+src/lib/personal-best.ts      running bestYaw from ROI quality
+src/lib/quality.ts            Laplacian / edges / weighted score
+docs/LIMITS.md                blockers, ceiling, next steps (EN)
+docs/LIMITS.zh-CN.md          卡点 / 上限 / 短板 / 后续
 src/components/EarCaptureApp.tsx
 ```
 
-Unit tests (`npm test`) cover Euler round-trip, FISWG yaw sign, prompt priority, offset clamp, dwell, and ROI quality — no camera required.
+Unit tests (`npm test`) cover Euler, prompt flow, bestYaw (including a 45° peak), rejection of a 70–90-only gate, dwell, and ROI quality — no camera required.
 
-The in-app **姿态模拟器** feeds synthetic yaw/pitch/roll so you can exercise guidance without a webcam.
+The in-app **姿态模拟器** can enable **质量随 yaw 变化** (default peak 45°) to watch READY fire outside 70–90.
