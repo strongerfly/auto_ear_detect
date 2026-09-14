@@ -47,4 +47,4 @@ Head pose from MediaPipe is for **direction**. Ear-ROI sharpness/structure is ho
 5. Ear score ≥ **92%** of the side’s peak; brightness 60–200  
 6. No yaw ∈ [70, 90] requirement; no user confirm  
 
-Guidance is one short line (中文 / English in the app). While the user is still turning we only talk about direction; hair / light / roll wait until they are close. READY promotes faster so prompts do not feel like a checklist.
+Guidance is one short line (中文 / English in the app). While the peak is still unknown we only ask the user to turn slowly (no “a little more / ease back” vs a prior angle). Near a locked peak but not yet stable we do **not** say “hold still” while capture is still blocked. READY promotes faster so prompts do not feel like a checklist. Absolute yaw/pitch/roll numbers stay behind a debug toggle.

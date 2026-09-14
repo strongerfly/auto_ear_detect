@@ -46,6 +46,7 @@ function familyOf(prompt: PromptKey): Family {
     case "TOO_BRIGHT":
       return "quality";
     case "HOLD_STILL":
+    case "NEAR_PEAK":
       return "hold";
     case "READY":
       return "ready";

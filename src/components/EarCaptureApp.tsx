@@ -14,9 +14,10 @@ import { DEFAULT_SIM, SimulatorPanel, type SimState } from "./SimulatorPanel";
 import { useFaceLandmarker } from "../hooks/useFaceLandmarker";
 import { useWebcam } from "../hooks/useWebcam";
 import { useLocale } from "../i18n";
+import { countdownSeconds, stepAutoShutter } from "../lib/auto-shutter";
 import { dwellPrompt, INITIAL_DWELL, type DwellState } from "../lib/dwell";
 import { matrixToFiswgEuler } from "../lib/euler";
-import { evaluateGuidance, isAngleStable } from "../lib/guidance";
+import { evaluateGuidance, isAngleStable, promptForDisplay } from "../lib/guidance";
 import {
   earRoiBox,
   faceHeightRatio,
@@ -42,6 +43,7 @@ type LiveState = {
   roi: RoiBox | null;
   quality: EarQuality | null;
   faceHeightRatio: number;
+  shutterCountdownMs: number | null;
 };
 
 const INITIAL_LIVE: LiveState = {
@@ -53,6 +55,7 @@ const INITIAL_LIVE: LiveState = {
   roi: null,
   quality: null,
   faceHeightRatio: 0,
+  shutterCountdownMs: null,
 };
 
 export function EarCaptureApp() {
@@ -69,6 +72,8 @@ export function EarCaptureApp() {
   const [side, setSide] = useState<EarSide>("rightEar");
   const [bests, setBests] = useState<PersonalBestMap>(() => loadPersonalBests());
   const [autoShutter, setAutoShutter] = useState(true);
+  const [debugHud, setDebugHud] = useState(false);
+  const [relearnArmed, setRelearnArmed] = useState(false);
   const [lastCapture, setLastCapture] = useState<string | null>(null);
   const [sim, setSim] = useState<SimState>(DEFAULT_SIM);
   const [live, setLive] = useState<LiveState>(INITIAL_LIVE);
@@ -79,6 +84,8 @@ export function EarCaptureApp() {
   const simRef = useRef(sim);
   const autoShutterRef = useRef(autoShutter);
   const shutterLatch = useRef(false);
+  const countdownStartedAt = useRef<number | null>(null);
+  const cancelReadyEpisode = useRef(false);
   const dwellRef = useRef<DwellState>(INITIAL_DWELL);
   const lastAngles = useRef<EulerDeg | null>(null);
   const stableFrames = useRef(0);
@@ -345,30 +352,39 @@ export function EarCaptureApp() {
         readyBurst.current += 1;
       } else {
         readyBurst.current = 0;
+        shutterLatch.current = false;
+        cancelReadyEpisode.current = false;
+        countdownStartedAt.current = null;
       }
 
-      if (
-        guidance.allowCapture &&
-        autoShutterRef.current &&
-        !shutterLatch.current &&
-        readyBurst.current >= poseConfig.ready.burstFrames
-      ) {
+      const shutter = stepAutoShutter({
+        allowCapture: guidance.allowCapture,
+        autoShutter: autoShutterRef.current,
+        cancelled: cancelReadyEpisode.current,
+        latched: shutterLatch.current,
+        startedAt: countdownStartedAt.current,
+        now,
+        countdownMs: poseConfig.ready.autoShutterCountdownMs,
+        burstCount: readyBurst.current,
+        burstNeeded: poseConfig.ready.burstFrames,
+      });
+      countdownStartedAt.current = shutter.startedAt;
+      if (shutter.fire) {
         shutterLatch.current = true;
+        countdownStartedAt.current = null;
         captureStillRef.current();
-      }
-      if (!guidance.allowCapture) {
-        shutterLatch.current = false;
       }
 
       setLive({
         yaw,
         pitch,
         roll,
-        prompt: shown,
+        prompt: promptForDisplay(shown, guidance.allowCapture),
         allowCapture: guidance.allowCapture,
         roi,
         quality,
         faceHeightRatio: heightRatio,
+        shutterCountdownMs: shutter.fire ? null : shutter.remainingMs,
       });
     };
 
@@ -376,11 +392,26 @@ export function EarCaptureApp() {
     return () => cancelAnimationFrame(raf);
   }, [landmarker, videoRef]);
 
+  useEffect(() => {
+    setRelearnArmed(false);
+  }, [side]);
+
   const recalibrateSide = () => {
+    if (!relearnArmed) {
+      setRelearnArmed(true);
+      return;
+    }
     const next = { ...bests, [side]: null };
     bestsRef.current = next;
     setBests(next);
     savePersonalBests(next);
+    setRelearnArmed(false);
+  };
+
+  const cancelAutoShutter = () => {
+    cancelReadyEpisode.current = true;
+    countdownStartedAt.current = null;
+    setLive((prev) => ({ ...prev, shutterCountdownMs: null }));
   };
 
   const downloadCapture = () => {
@@ -449,15 +480,33 @@ export function EarCaptureApp() {
         <div className="prompt" data-ready={live.allowCapture}>
           {promptText}
         </div>
+        {live.shutterCountdownMs !== null ? (
+          <div className="countdown-banner" role="status">
+            <span>
+              {t("autoShutterCountdown", {
+                seconds: countdownSeconds(live.shutterCountdownMs),
+              })}
+            </span>
+            <button
+              type="button"
+              className="countdown-cancel"
+              onClick={cancelAutoShutter}
+            >
+              {t("cancelAutoShutter")}
+            </button>
+          </div>
+        ) : null}
         <span className="stage-tag">{stageHint}</span>
       </section>
 
-      <AngleHud
-        yaw={live.yaw}
-        pitch={live.pitch}
-        roll={live.roll}
-        bestYaw={personalBest}
-      />
+      {debugHud ? (
+        <AngleHud
+          yaw={live.yaw}
+          pitch={live.pitch}
+          roll={live.roll}
+          bestYaw={personalBest}
+        />
+      ) : null}
 
       <div className="dock">
         <button type="button" className="ghost" onClick={() => void start()}>
@@ -478,10 +527,26 @@ export function EarCaptureApp() {
           <input
             type="checkbox"
             checked={autoShutter}
-            onChange={(e) => setAutoShutter(e.target.checked)}
+            onChange={(e) => {
+              const on = e.target.checked;
+              setAutoShutter(on);
+              if (!on) {
+                countdownStartedAt.current = null;
+                setLive((prev) => ({ ...prev, shutterCountdownMs: null }));
+              }
+            }}
           />
           {t("autoShutter")}
         </label>
+        {live.shutterCountdownMs !== null ? (
+          <button
+            type="button"
+            className="countdown-cancel"
+            onClick={cancelAutoShutter}
+          >
+            {t("cancelAutoShutter")}
+          </button>
+        ) : null}
         <button
           type="button"
           className="ghost"
@@ -498,9 +563,22 @@ export function EarCaptureApp() {
             ? t("learnedNote")
             : t("learningNote")}
         </span>
-        <button type="button" className="ghost" onClick={recalibrateSide}>
-          {t("relearn")}
+        <button
+          type="button"
+          className={relearnArmed ? "ghost warn" : "ghost"}
+          onClick={recalibrateSide}
+        >
+          {relearnArmed ? t("relearnConfirm") : t("relearn")}
         </button>
+        {relearnArmed ? (
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => setRelearnArmed(false)}
+          >
+            {t("relearnCancel")}
+          </button>
+        ) : null}
       </div>
 
       {lastCapture ? (
@@ -511,6 +589,15 @@ export function EarCaptureApp() {
       ) : null}
 
       <InstructionsPanel />
+
+      <label className="check debug-toggle">
+        <input
+          type="checkbox"
+          checked={debugHud}
+          onChange={(e) => setDebugHud(e.target.checked)}
+        />
+        {t("debugHud")}
+      </label>
 
       <SimulatorPanel sim={sim} onChange={setSim} />
 

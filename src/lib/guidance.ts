@@ -40,7 +40,7 @@ export type GuidanceResult = {
   allowCapture: boolean;
 };
 
-/** Progressive yaw hints relative to personal best (or the soft prior). */
+/** Progressive yaw hints. Unlocked: sweep only — never steer vs the prior. */
 function pickYawPrompt(
   yaw: number,
   t: EffectiveTargets,
@@ -52,6 +52,11 @@ function pickYawPrompt(
 
   if (Math.abs(yaw) >= config.failure.stuckNearOuterEdgeDeg) {
     return "TURN_BACK_OVERSHOOT";
+  }
+
+  if (!t.locked) {
+    if (yawDelta >= config.search.slowYawDeltaDeg) return "SLOW_DOWN";
+    return t.side === "rightEar" ? "SWEEP_RIGHT_EAR" : "SWEEP_LEFT_EAR";
   }
 
   const err = yaw - t.yawCenter;
@@ -184,7 +189,20 @@ export function pickPrompt(
   if (allowCapture) {
     return { ...fail, prompt: "READY", allowCapture: true };
   }
-  return { ...fail, prompt: "HOLD_STILL" };
+  // Near a locked peak but not stable / not quite the peak score.
+  // Never claim "hold still" while capture is still blocked.
+  return { ...fail, prompt: "NEAR_PEAK" };
+}
+
+/** Dwell can lag the gate: never show READY/"hold still" on a gray shutter. */
+export function promptForDisplay(
+  prompt: PromptKey,
+  allowCapture: boolean,
+): PromptKey {
+  if (!allowCapture && (prompt === "READY" || prompt === "HOLD_STILL")) {
+    return "NEAR_PEAK";
+  }
+  return prompt;
 }
 
 export function evaluateGuidance(

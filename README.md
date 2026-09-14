@@ -15,9 +15,9 @@ Stack: **Vite + React + TypeScript** + `@mediapipe/tasks-vision` Face Landmarker
 1. Allow the camera. Switch language in the header if you want.
 2. Tap **Left ear** or **Right ear** (your body, not the mirror). Right ear → turn left; left ear → turn right.
 3. Turn your **head** slowly (not the laptop/phone) until the ear looks clearest. The first sweep is how the app learns that side; capture stays off until then.
-4. Wait for **Ready to capture**. Auto-shutter is on by default and will shoot. Then switch sides and turn again.
+4. Wait for **Ready to capture**. Auto-shutter is on by default and counts down — tap **Cancel auto-capture** if you need to stop it. Then switch sides and turn again.
 
-If the remembered angle is wrong, use **Relearn this side** and turn slowly once more. Expand **Instructions** in the app for overshoot, camera permission, and limits.
+If the remembered angle is wrong, use **Relearn this side** (confirm once) and turn slowly once more. Expand **Instructions** in the app for overshoot, camera permission, and limits.
 
 ## Run
 
@@ -74,7 +74,7 @@ READY when all of:
 4. Stable ~**12** frames
 5. Score ≥ **92%** of the personal peak, brightness in range
 
-No “confirm the ear is frontal” step. Auto-shutter waits 3 ready frames. **Relearn this side** clears the stored peak; learning itself is automatic.
+No “confirm the ear is frontal” step. Auto-shutter waits 3 ready frames, then a **cancelable countdown**. **Relearn this side** asks for a second confirm before clearing the stored peak; learning itself is automatic. The absolute-angle HUD is hidden unless you turn on **Debug: show angles**.
 
 ## Ceiling and shortfalls（上限与短板）
 

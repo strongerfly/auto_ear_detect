@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { poseConfig } from "../config";
-import { evaluateGuidance } from "./guidance";
+import { evaluateGuidance, promptForDisplay } from "./guidance";
 import { dwellMsFor, dwellPrompt, INITIAL_DWELL } from "./dwell";
 import { effectiveTargets } from "./effective-targets";
 import {
@@ -93,25 +93,28 @@ describe("pickPrompt priority", () => {
     ).toBe("PITCH_UP");
   });
 
-  it("right-ear sweep / more / back vs the soft prior", () => {
+  it("right-ear sweep stays on SWEEP until a peak is locked (no prior TURN_MORE / TURN_BACK)", () => {
     expect(
       evaluateGuidance(base({ yaw: 20 }), poseConfig, "rightEar", null, 0).prompt,
     ).toBe("SWEEP_RIGHT_EAR");
     expect(
       evaluateGuidance(base({ yaw: 45 }), poseConfig, "rightEar", null, 0).prompt,
-    ).toBe("TURN_MORE");
+    ).toBe("SWEEP_RIGHT_EAR");
+    expect(
+      evaluateGuidance(base({ yaw: 75 }), poseConfig, "rightEar", null, 0).prompt,
+    ).toBe("SWEEP_RIGHT_EAR");
     expect(
       evaluateGuidance(base({ yaw: 90 }), poseConfig, "rightEar", null, 0).prompt,
     ).toBe("TURN_BACK_OVERSHOOT");
   });
 
-  it("left-ear sweep (mirrored) vs the soft prior", () => {
+  it("left-ear sweep (mirrored) stays on SWEEP until a peak is locked", () => {
     expect(
       evaluateGuidance(base({ yaw: -20 }), poseConfig, "leftEar", null, 0).prompt,
     ).toBe("SWEEP_LEFT_EAR");
     expect(
       evaluateGuidance(base({ yaw: -45 }), poseConfig, "leftEar", null, 0).prompt,
-    ).toBe("TURN_MORE");
+    ).toBe("SWEEP_LEFT_EAR");
     expect(
       evaluateGuidance(base({ yaw: -90 }), poseConfig, "leftEar", null, 0).prompt,
     ).toBe("TURN_BACK_OVERSHOOT");
@@ -174,14 +177,61 @@ describe("pickPrompt priority", () => {
     ).toBe("SWEEP_RIGHT_EAR");
   });
 
-  it("HOLD_STILL until stable frames, then READY near a locked peak", () => {
+  it("NEAR_PEAK until stable frames, then READY near a locked peak", () => {
     const best = peakAt(60);
     const hold = evaluateGuidance(base(), poseConfig, "rightEar", best, 3);
-    expect(hold.prompt).toBe("HOLD_STILL");
+    expect(hold.prompt).toBe("NEAR_PEAK");
     expect(hold.allowCapture).toBe(false);
     const ready = evaluateGuidance(base(), poseConfig, "rightEar", best, 12);
     expect(ready.prompt).toBe("READY");
     expect(ready.allowCapture).toBe(true);
+  });
+
+  it("cold start (unlocked) cannot capture and only sweeps", () => {
+    const r = evaluateGuidance(base({ yaw: 0 }), poseConfig, "rightEar", null, 12);
+    expect(r.allowCapture).toBe(false);
+    expect(r.targets.locked).toBe(false);
+    expect(r.prompt).toBe("SWEEP_RIGHT_EAR");
+    expect(r.prompt).not.toBe("READY");
+    expect(r.prompt).not.toBe("HOLD_STILL");
+    expect(r.prompt).not.toBe("TURN_MORE");
+    expect(r.prompt).not.toBe("TURN_BACK");
+  });
+
+  it("unlocked never steers TURN_MORE / TURN_BACK against the prior", () => {
+    for (const yaw of [0, 20, 45, 60, 75, 80]) {
+      const p = evaluateGuidance(base({ yaw }), poseConfig, "rightEar", null, 0)
+        .prompt;
+      expect(p).not.toBe("TURN_MORE");
+      expect(p).not.toBe("TURN_BACK");
+    }
+  });
+
+  it("TURN_BACK only after a peak is locked", () => {
+    expect(
+      evaluateGuidance(base({ yaw: 80 }), poseConfig, "rightEar", null, 0).prompt,
+    ).toBe("SWEEP_RIGHT_EAR");
+    expect(
+      evaluateGuidance(base({ yaw: 80 }), poseConfig, "rightEar", peakAt(45), 0)
+        .prompt,
+    ).toBe("TURN_BACK");
+  });
+
+  it("never returns HOLD_STILL while capture is blocked", () => {
+    const unlocked = evaluateGuidance(base({ yaw: 60 }), poseConfig, "rightEar", null, 3);
+    const near = evaluateGuidance(base(), poseConfig, "rightEar", peakAt(60), 3);
+    expect(unlocked.allowCapture).toBe(false);
+    expect(near.allowCapture).toBe(false);
+    expect(unlocked.prompt).not.toBe("HOLD_STILL");
+    expect(near.prompt).not.toBe("HOLD_STILL");
+    expect(near.prompt).toBe("NEAR_PEAK");
+  });
+
+  it("promptForDisplay never shows READY on a gray shutter", () => {
+    expect(promptForDisplay("READY", false)).toBe("NEAR_PEAK");
+    expect(promptForDisplay("HOLD_STILL", false)).toBe("NEAR_PEAK");
+    expect(promptForDisplay("READY", true)).toBe("READY");
+    expect(promptForDisplay("SWEEP_RIGHT_EAR", false)).toBe("SWEEP_RIGHT_EAR");
   });
 
   it("left/right modes change copy at the same physical yaw=0", () => {
