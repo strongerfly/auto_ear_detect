@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "coordinateConvention": {
+    "yawPositive": "rightEarVisible",
+    "note": "FISWG: +yaw 露右耳，-yaw 露左耳。实现时用真机标定矩阵→Euler 符号，使与此一致。",
+    "eulerOrder": "YXZ",
+    "units": "degrees"
+  },
+  "smoothing": {
+    "enabled": true,
+    "oneEuro": { "minCutoff": 1.0, "beta": 0.007, "dCutoff": 1.0 }
+  },
+  "faceGates": {
+    "minFacePresence": 0.5,
+    "minTrackingConfidence": 0.5,
+    "minFaceHeightRatio": 0.25,
+    "maxFaceHeightRatio": 0.70
+  },
+  "poseTargets": {
+    "rightEar": {
+      "yawCenter": 80, "yawMin": 70, "yawMax": 90,
+      "pitchMin": -8, "pitchMax": 8, "rollMin": -8, "rollMax": 8
+    },
+    "leftEar": {
+      "yawCenter": -80, "yawMin": -90, "yawMax": -70,
+      "pitchMin": -8, "pitchMax": 8, "rollMin": -8, "rollMax": 8
+    }
+  },
+  "poseGuidance": {
+    "rollCorrectAbove": 12,
+    "pitchTooHighAbove": 12,
+    "pitchTooLowBelow": -12,
+    "rightEar": { "turnMoreBelow": 55, "almostBelow": 70, "tooFarAbove": 95 },
+    "leftEar": { "turnMoreAbove": -55, "almostAbove": -70, "tooFarBelow": -95 }
+  },
+  "captureBands": {
+    "nearMaxAbsYawError": 10,
+    "readyMaxAbsYawError": 5,
+    "readyMaxAbsPitchError": 8,
+    "readyMaxAbsRollError": 8
+  },
+  "personalOffset": {
+    "enabled": true,
+    "clampDeg": 15,
+    "calibrationYawMinAbs": 60,
+    "calibrationYawMaxAbs": 95,
+    "defaultOffset": { "leftEar": 0, "rightEar": 0 }
+  },
+  "stability": {
+    "requiredStableFrames": 12,
+    "maxDeltaYawDeg": 3,
+    "maxDeltaPitchDeg": 3,
+    "maxDeltaRollDeg": 3
+  },
+  "earRoiQuality": {
+    "laplacianMin": 100,
+    "brightnessMin": 60,
+    "brightnessMax": 200,
+    "minEdgeEnergy": 15
+  },
+  "promptUx": { "minDwellMs": 400, "onlyOnePrompt": true },
+  "copy": {
+    "NO_FACE": "请把脸移入取景框",
+    "TOO_FAR": "请靠近一点",
+    "TOO_CLOSE": "请稍远一点",
+    "FIX_ROLL": "请摆正脑袋，不要歪头",
+    "PITCH_DOWN": "请稍微低头",
+    "PITCH_UP": "请稍微抬头",
+    "TURN_LEFT": "请向左转头，露出右耳",
+    "TURN_LEFT_MORE": "再向左转一点",
+    "TURN_LEFT_BACK": "转得有点过了，往回一点",
+    "TURN_RIGHT": "请向右转头，露出左耳",
+    "TURN_RIGHT_MORE": "再向右转一点",
+    "TURN_RIGHT_BACK": "转得有点过了，往回一点",
+    "CLEAR_HAIR": "请把耳边头发拨开",
+    "HOLD_STILL": "很好，请保持不动",
+    "BAD_LIGHT": "光线不太好，换亮一点的地方",
+    "READY": "可以拍了"
+  }
+}

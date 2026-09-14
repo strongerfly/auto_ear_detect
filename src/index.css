@@ -1,0 +1,301 @@
+:root {
+  color-scheme: dark;
+  --bg: #0b1210;
+  --panel: #141f1c;
+  --ink: #e7f4ee;
+  --muted: #93ada3;
+  --accent: #3ee0b8;
+  --accent-dim: #1a4f43;
+  --warn: #f3c16f;
+  --danger: #ef8b73;
+  font-family: "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC",
+    "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(1200px 500px at 10% -10%, #16352d 0%, transparent 55%),
+    var(--bg);
+}
+
+button,
+input,
+summary {
+  font: inherit;
+}
+
+.app {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 28px 20px 64px;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.eyebrow {
+  margin: 0;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-size: 11px;
+  color: var(--accent);
+}
+
+h1 {
+  margin: 4px 0 0;
+  font-size: 32px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+
+.status {
+  color: var(--muted);
+  margin: 12px 0 18px;
+  font-size: 14px;
+}
+
+.modes {
+  display: flex;
+  padding: 4px;
+  background: var(--panel);
+  border-radius: 999px;
+  border: 1px solid #2a3f38;
+}
+
+.modes button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 8px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.modes button.on {
+  background: var(--accent);
+  color: #06241c;
+  font-weight: 700;
+}
+
+.stage {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #070c0b;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid #2a3f38;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+.stage.ready {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+.cam,
+.overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  /* Front-camera selfie preview. Inference uses the unmirrored video buffer. */
+  transform: scaleX(-1);
+}
+
+.overlay {
+  pointer-events: none;
+}
+
+.scratch {
+  display: none;
+}
+
+.prompt {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  text-align: center;
+  font-size: clamp(20px, 3.4vw, 34px);
+  font-weight: 700;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(8, 16, 14, 0.72);
+  backdrop-filter: blur(8px);
+  transform: none;
+}
+
+.prompt[data-ready="true"] {
+  color: #06241c;
+  background: var(--accent);
+}
+
+.stage-tag {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  font-size: 12px;
+  color: var(--muted);
+  background: rgba(8, 16, 14, 0.65);
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.hud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin: 14px 0;
+  padding: 12px 14px;
+  background: var(--panel);
+  border-radius: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud strong {
+  color: var(--ink);
+  font-weight: 650;
+  margin-left: 4px;
+}
+
+.hud-state {
+  margin-left: auto;
+  color: var(--warn);
+}
+
+.dock {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.ghost,
+.capture {
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border: 1px solid #335148;
+  background: #18241f;
+  color: var(--ink);
+}
+
+.ghost:disabled,
+.capture:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.capture {
+  background: #1f3d34;
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+.capture:not(:disabled) {
+  background: var(--accent);
+  color: #06241c;
+}
+
+.check {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--muted);
+}
+
+.calib-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.preview {
+  margin: 8px 0 18px;
+  padding: 12px;
+  background: var(--panel);
+  border-radius: 12px;
+}
+
+.preview img {
+  width: min(420px, 100%);
+  border-radius: 8px;
+  display: block;
+  background: #e7f4ee;
+  border: 1px solid #335148;
+}
+
+.preview figcaption {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.sim {
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 12px 14px 16px;
+  border: 1px dashed #335148;
+}
+
+.sim summary {
+  cursor: pointer;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.sim-row,
+.sim-slider {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 8px 0;
+  color: var(--muted);
+}
+
+.sim-slider {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.sim-slider span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.sim-slider em {
+  font-style: normal;
+  color: var(--ink);
+}
+
+.sim input[type="range"] {
+  width: 100%;
+}
+
+.foot {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+code {
+  color: var(--accent);
+}
