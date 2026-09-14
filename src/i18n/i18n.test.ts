@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { PROMPT_KEYS } from "../config";
 import {
   LOCALE_STORAGE_KEY,
@@ -110,6 +112,17 @@ describe("string lookup", () => {
     expect(en).toContain("Relearn this side");
     expect(en.toLowerCase()).toContain("clinical ear scanner");
     expect(en.toLowerCase()).not.toContain("calibrate this side");
+  });
+
+  it("README.zh-CN teaches auto-learn, not 60–95 offset calibration", () => {
+    const md = readFileSync(
+      resolve(import.meta.dirname, "../../README.zh-CN.md"),
+      "utf8",
+    );
+    expect(md).not.toMatch(/60\s*[–-]\s*95/);
+    expect(md).not.toContain("校准此侧偏移");
+    expect(md).toContain("重新学习此侧");
+    expect(md).toContain("自动学");
   });
 
   it("interpolates placeholders", () => {
