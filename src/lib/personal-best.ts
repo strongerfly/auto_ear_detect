@@ -116,6 +116,7 @@ export function updatePersonalBest(
     return { yaw, score: Math.max(score, current.score) };
   }
 
+  // alwaysRescore: never freeze the window to last session's yaw.
   return current;
 }
 

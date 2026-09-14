@@ -45,7 +45,7 @@ P0/P1 items below are implemented on this branch unless marked leftover.
 | 25 | Cold start **require** 60% sweep coverage before READY | Would block a clear ~45° hold; config key exists, **not a hard gate** |
 | 26 | `clampOffsetDeg` / next-session search narrow ±10° | Would refuse 45° if last peak was 80°; `alwaysRescore` keeps 35–90 |
 | 27 | Timeout as terminal fail | `FAIL_TIMEOUT` only if stuck with **no** peak |
-| 28 | Burst image buffer pick-by-score | Extra 3 ready frames then current frame; no 3-frame JPEG buffer |
+| 28 | Burst image buffer pick-by-score | **Done** — last 3 READY frames, keep highest score. Not aligned JPEG fusion (LIMITS next) |
 | 29 | Dedicated ear segmentation / meatus | No model; dark-center penalty is weak |
 | 30 | Device Laplacian calibration | Raw 80/120 |
 | 31 | Show absolute target yaw | **Won't do** in normal UI |

@@ -15,6 +15,7 @@ import { useFaceLandmarker } from "../hooks/useFaceLandmarker";
 import { useWebcam } from "../hooks/useWebcam";
 import { useLocale } from "../i18n";
 import { dwellPrompt, INITIAL_DWELL, type DwellState } from "../lib/dwell";
+import { pickBurst, rememberBurst, type BurstEntry } from "../lib/burst";
 import { matrixToFiswgEuler } from "../lib/euler";
 import { evaluateGuidance, isAngleStable } from "../lib/guidance";
 import {
@@ -30,7 +31,7 @@ import {
   updatePersonalBest,
   type PersonalBestMap,
 } from "../lib/personal-best";
-import { measureEarQuality, qualityAlongYawCurve } from "../lib/quality";
+import { measureEarQuality, qualityAlongYawCurve, frontalQualityScore } from "../lib/quality";
 import type { EarQuality, EulerDeg, RoiBox } from "../lib/types";
 
 type LiveState = {
@@ -91,6 +92,7 @@ export function EarCaptureApp() {
   const searchStartedAt = useRef<number | null>(null);
   const wasPoseReady = useRef(false);
   const shutterCancel = useRef(false);
+  const burstRing = useRef<BurstEntry<HTMLCanvasElement>[]>([]);
 
   sideRef.current = side;
   bestsRef.current = bests;
@@ -113,38 +115,49 @@ export function EarCaptureApp() {
   const liveRef = useRef(live);
   liveRef.current = live;
 
-  const captureStill = useCallback(() => {
-    const video = videoRef.current;
-    const canvas = document.createElement("canvas");
-    const snap = liveRef.current;
-    const label = tRef.current;
-    if (simRef.current.enabled || !video || video.readyState < 2) {
-      canvas.width = 960;
-      canvas.height = 540;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      drawSimStill(
-        ctx,
-        canvas.width,
-        canvas.height,
-        sideRef.current,
-        simRef.current,
-        snap.yaw,
-        snap.pitch,
-        snap.roll,
-        label(sideRef.current === "rightEar" ? "simStillRight" : "simStillLeft"),
-        label(sideRef.current === "rightEar" ? "roiRight" : "roiLeft"),
-      );
-    } else {
+  const paintCaptureCanvas = useCallback(
+    (canvas: HTMLCanvasElement) => {
+      const video = videoRef.current;
+      const snap = liveRef.current;
+      const label = tRef.current;
+      if (simRef.current.enabled || !video || video.readyState < 2) {
+        canvas.width = 960;
+        canvas.height = 540;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return false;
+        drawSimStill(
+          ctx,
+          canvas.width,
+          canvas.height,
+          sideRef.current,
+          simRef.current,
+          snap.yaw,
+          snap.pitch,
+          snap.roll,
+          label(sideRef.current === "rightEar" ? "simStillRight" : "simStillLeft"),
+          label(sideRef.current === "rightEar" ? "roiRight" : "roiLeft"),
+        );
+        return true;
+      }
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+      if (!ctx) return false;
       ctx.drawImage(video, 0, 0);
-    }
-    const url = canvas.toDataURL("image/png");
-    setLastCapture(url);
-  }, [videoRef]);
+      return true;
+    },
+    [videoRef],
+  );
+
+  const captureStill = useCallback(() => {
+    const picked = pickBurst(
+      burstRing.current,
+      poseConfig.ready.pickBurstBy,
+    );
+    const canvas = picked?.payload ?? document.createElement("canvas");
+    if (!picked && !paintCaptureCanvas(canvas)) return;
+    setLastCapture(canvas.toDataURL("image/png"));
+  }, [paintCaptureCanvas]);
 
   const captureStillRef = useRef(captureStill);
   captureStillRef.current = captureStill;
@@ -369,9 +382,29 @@ export function EarCaptureApp() {
 
       if (guidance.allowCapture) {
         readyBurst.current += 1;
+        const score = quality
+          ? frontalQualityScore(
+              quality,
+              yaw ?? undefined,
+              poseConfig,
+              currentSide,
+            )
+          : 0;
+        const recycled =
+          burstRing.current.length >= poseConfig.ready.burstFrames
+            ? burstRing.current[0].payload
+            : document.createElement("canvas");
+        if (paintCaptureCanvas(recycled)) {
+          burstRing.current = rememberBurst(
+            burstRing.current,
+            { score, payload: recycled },
+            poseConfig.ready.burstFrames,
+          );
+        }
       } else {
         readyBurst.current = 0;
         shutterCancel.current = false;
+        burstRing.current = [];
       }
 
       if (
@@ -403,7 +436,7 @@ export function EarCaptureApp() {
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [landmarker, videoRef]);
+  }, [landmarker, videoRef, paintCaptureCanvas]);
 
   const recalibrateSide = () => {
     if (!window.confirm(t("relearnConfirm"))) return;

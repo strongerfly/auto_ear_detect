@@ -76,17 +76,41 @@ READY when all of:
 4. Stable ~**12** frames
 5. Score ≥ **92%** of the personal peak, brightness in range
 
-No “confirm the ear is frontal” step. Auto-shutter is optional and off by default; when on, it waits 3 ready frames. **Relearn this side** clears the stored peak; learning itself is automatic.
+No “confirm the ear is frontal” step. Auto-shutter is optional and off by default; when on, it waits 3 ready frames and **keeps the highest-score still**. **Relearn this side** clears the stored peak; learning itself is automatic.
 
 While still learning (no locked peak), prompts stay on the sweep intro — a 60° prior never fires TURN_BACK / HOLD. Absolute yaw is hidden in a debug disclosure; the normal UI does not show a target degree.
 
-## Ceiling and shortfalls（上限与短板）
+## Ceiling vs cannot-do（上限与做不到）
 
-What this build **can** do: on-device Face Landmarker for turn direction, plus ear-ROI sharpness to auto-learn a **personal** clearest pinna frame while the user turns. READY follows that peak, not a universal pose band.
+The five product-owner columns live in full in **[docs/LIMITS.md](docs/LIMITS.md)** · **[docs/LIMITS.zh-CN.md](docs/LIMITS.zh-CN.md)**. Summary:
 
-What it **cannot** pretend: it is not a clinical ear scanner, it does not see the ear canal, and it does not “understand” ears. Tracker drop at deep profile, hair/blur false peaks, and camera-dependent Laplacian scores still need better models and labeled side-face data. Haircut or glasses can stale a remembered peak — that is why **Relearn this side** exists.
+### 能实现的天花板 / Ceiling that ships
 
-Full table (blockers / ceiling / next / conditions): **[docs/LIMITS.md](docs/LIMITS.md)** · **[docs/LIMITS.zh-CN.md](docs/LIMITS.zh-CN.md)**.
+- Per-side **quality peak yaw** while turning (\|yaw\| 35–90, soft preferred 40–80). A **~45°** peak can READY; a generic 70–90 hold with no locked peak cannot.
+- READY near that personal best (**±5°**, exit hysteresis 8°) with score ≥ 92% of peak and ~12 stable frames. No “confirm the ear is frontal”.
+- Unlocked: sweep intro only. Locked overshoot: turn back toward the **personal** peak. Face-lost keeps `bestYaw`. After READY, 3 frames pick the highest score.
+
+### 明确做不到的 / Explicitly not solved
+
+Do not treat these as done. Each one was tried; the partial path is in LIMITS.
+
+- **No ear segmentation model.** Face-mesh ear points were considered and not wired — they fail in profile. We crop a guessed ROI and score sharpness.
+- **Hair / occlusion / background texture** can still make a false peak. CLEAR_HAIR is a near-peak heuristic, not a detector.
+- **Motion blur** and **laptop FOV** are only partly handled (slow-down, 35–90 search). Laplacian 80/120 is not portable across webcams.
+- **Quality score ≠ anatomical ear-normal / meatus.** Not a clinical ear scanner. No camera E2E in CI.
+- High-yaw **tracker drop** (~90°) pauses scoring; we do not reconstruct a 3D ear.
+
+### 短板 / Shortfalls
+
+False peaks, inner-edge lock after tracker drop, unsynced 3-frame burst (not aligned fusion), no worker, stale peaks after a haircut (Relearn).
+
+### 后续优化 / Next optimizations
+
+Ear detector/seg → learned quality head → device blur calibration → aligned multi-frame fusion → last-good freeze → worker inference. Meatus only with clinical scope.
+
+### 优化条件 / Conditions
+
+Labeled ear-angle dataset (including ~45°), on-device size/latency budget, per-device calibration pass, profile-labeled set that still works when the landmarker is shaky.
 
 ## Tuning
 
