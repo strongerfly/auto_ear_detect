@@ -11,6 +11,7 @@ import {
 import {
   interpolate,
   looksLikeRigidAngleChecklist,
+  messagesFor,
   translate,
   userFacingKeys,
 } from "./messages";
@@ -72,6 +73,42 @@ describe("string lookup", () => {
     expect(translate("en", "helpTitle")).toBe("Instructions");
     expect(translate("zh", "relearn")).toBe("重新学习此侧");
     expect(translate("en", "relearn")).toBe("Relearn this side");
+  });
+
+  it("NEAR_PEAK does not tell the user to hold still", () => {
+    expect(translate("zh", "NEAR_PEAK")).not.toMatch(/保持不动|很好，保持/);
+    expect(translate("en", "NEAR_PEAK")).not.toMatch(/hold still/i);
+    expect(translate("zh", "SWEEP_RIGHT_EAR")).toContain("慢慢向左转");
+    expect(translate("zh", "HOLD_STILL")).toMatch(/保持不动/);
+  });
+
+  it("WRONG_SIDE names body left/right vs the target ear", () => {
+    expect(translate("zh", "WRONG_SIDE")).toMatch(/拍右耳/);
+    expect(translate("zh", "WRONG_SIDE")).toMatch(/拍左耳/);
+    expect(translate("zh", "WRONG_SIDE")).toMatch(/身体/);
+    expect(translate("en", "WRONG_SIDE")).toMatch(/right ear/i);
+    expect(translate("en", "WRONG_SIDE")).toMatch(/left ear/i);
+    expect(translate("en", "WRONG_SIDE")).toMatch(/body/i);
+  });
+
+  it("save-image copy says the preview is mirrored vs the body", () => {
+    expect(translate("zh", "lastCaptureCaption")).toMatch(/镜像/);
+    expect(translate("en", "lastCaptureCaption")).toMatch(/mirror/i);
+    expect(translate("zh", "footer")).toMatch(/镜子/);
+    expect(translate("en", "footer")).toMatch(/mirror/i);
+  });
+
+  it("has no calibrate-offset UX and a confirmable relearn", () => {
+    for (const locale of ["zh", "en"] as const) {
+      const table = messagesFor(locale);
+      for (const key of Object.keys(table) as Array<keyof typeof table>) {
+        expect(key).not.toMatch(/helpCalibrate/i);
+        expect(table[key]).not.toMatch(/校准此侧偏移/);
+      }
+    }
+    expect(translate("zh", "relearn")).toBe("重新学习此侧");
+    expect(translate("zh", "relearnConfirm")).toMatch(/确认/);
+    expect(translate("en", "relearnConfirm").length).toBeGreaterThan(0);
   });
 
   it("keeps user-facing help and sweep copy free of rigid angle checklists", () => {

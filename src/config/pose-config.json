@@ -58,6 +58,7 @@
     "brightnessMin": 60,
     "brightnessMax": 200,
     "burstFrames": 3,
+    "autoShutterCountdownMs": 3000,
     "pickBurstBy": "score",
     "requireUserConfirm": false,
     "pitchMaxAbs": 10,

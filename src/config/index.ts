@@ -18,6 +18,7 @@ export type PromptKey =
   | "WRONG_SIDE"
   | "CLEAR_HAIR"
   | "HOLD_STILL"
+  | "NEAR_PEAK"
   | "BAD_LIGHT"
   | "TOO_DARK"
   | "TOO_BRIGHT"
@@ -44,6 +45,7 @@ export const PROMPT_KEYS: PromptKey[] = [
   "WRONG_SIDE",
   "CLEAR_HAIR",
   "HOLD_STILL",
+  "NEAR_PEAK",
   "BAD_LIGHT",
   "TOO_DARK",
   "TOO_BRIGHT",
