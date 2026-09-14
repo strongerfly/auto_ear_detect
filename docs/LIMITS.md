@@ -29,7 +29,7 @@ Head pose from MediaPipe is for **direction**. Ear-ROI sharpness/structure is ho
 - **Ask “are you a 45° person?”:** will not. Peak is learned during a normal turn.
 - **Dedicated ear landmarks / 3D ear:** not wired. Face-mesh ear points are unreliable in profile, so we use head pose + ROI quality. Trigger: a stable profile ear-seg model within the latency budget.
 - **Require 60% window coverage before READY:** `minSweepCoverageRatio` is in config and **intentionally not a hard gate**, so a clear ear that peaks at ~45° can still READY. Documented as false-peak risk.
-- **45s timeout fail copy:** `failure.timeoutMs` exists; we do not nag it as the main path.
+- **45s timeout fail copy:** `FAIL_TIMEOUT` only if **no peak is locked and the user has stopped turning**. A 45° peak can still READY after a long session; it is recovery copy, not the main path.
 - **Meatus-like dark-blob penalty:** weak center-brightness heuristic only. Without seg we cannot tell meatus from hair shadow.
 
 ## Won't do

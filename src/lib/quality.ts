@@ -1,6 +1,7 @@
-import type { PoseConfig } from "../config";
+import type { EarSide, PoseConfig } from "../config";
 import { poseConfig } from "../config";
 import type { EarQuality } from "./types";
+import { earSearch } from "./search-band";
 
 function variance(values: Float64Array | number[]): number {
   const n = values.length;
@@ -121,6 +122,7 @@ export function frontalQualityScore(
   quality: EarQuality,
   yaw?: number,
   config: PoseConfig = poseConfig,
+  side: EarSide = "rightEar",
 ): number {
   const s = config.score;
   const sharp = unitInterval(
@@ -137,13 +139,12 @@ export function frontalQualityScore(
   let content = 0.5;
   if (yaw !== undefined) {
     const abs = Math.abs(yaw);
-    const inSearch =
-      abs >= config.search.yawAbsMin && abs <= config.search.yawAbsMax;
+    const band = earSearch(side, config);
+    const inSearch = abs >= band.yawAbsMin && abs <= band.yawAbsMax;
     content = s.content.requireSideFaceProxy && !inSearch ? 0 : 1;
     if (
       inSearch &&
-      (abs < config.search.preferredAbsMin ||
-        abs > config.search.preferredAbsMax)
+      (abs < band.preferredAbsMin || abs > band.preferredAbsMax)
     ) {
       content = Math.max(0, content - s.content.outsidePreferredSoftPenalty);
     }

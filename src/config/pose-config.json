@@ -18,18 +18,19 @@
     "maxFaceHeightRatio": 0.70
   },
   "search": {
-    "yawAbsMin": 35,
-    "yawAbsMax": 90,
-    "preferredAbsMin": 40,
-    "preferredAbsMax": 80,
-    "priorYawAbs": 60,
-    "pitchMin": -10,
-    "pitchMax": 10,
-    "rollMin": -8,
-    "rollMax": 8,
+    "rightEar": {
+      "yawAbsMin": 35, "yawAbsMax": 90,
+      "preferredAbsMin": 40, "preferredAbsMax": 80
+    },
+    "leftEar": {
+      "yawAbsMin": 35, "yawAbsMax": 90,
+      "preferredAbsMin": 40, "preferredAbsMax": 80
+    },
+    "pitchMin": -10, "pitchMax": 10, "rollMin": -8, "rollMax": 8,
     "minSweepCoverageRatio": 0.6,
     "allowResweepOnce": true,
     "tieBreak": "smallerAbsYaw",
+    "priorYawAbs": 60,
     "guidanceCoarseAbsError": 22,
     "slowYawDeltaDeg": 18
   },
@@ -64,9 +65,10 @@
     "rollMaxAbs": 8
   },
   "personalBest": {
-    "persist": true,
-    "alwaysRescore": true,
+    "persistSessionOffset": true,
+    "clampOffsetDeg": 20,
     "nextTimeNarrowSearchByDeg": 10,
+    "alwaysRescore": true,
     "minScoreImprove": 0.02
   },
   "poseGuidance": {
@@ -93,18 +95,21 @@
     "NO_FACE": "请把脸移入取景框",
     "TOO_FAR": "请靠近一点",
     "TOO_CLOSE": "请稍远一点，露出整只耳朵",
-    "FIX_ROLL": "头摆正一点",
-    "PITCH_DOWN": "稍微低头",
-    "PITCH_UP": "稍微抬头",
-    "SWEEP_RIGHT_EAR": "向左转头，慢慢找右耳最清楚的角度",
-    "SWEEP_LEFT_EAR": "向右转头，慢慢找左耳最清楚的角度",
+    "FIX_ROLL": "请摆正脑袋，不要歪头",
+    "PITCH_DOWN": "请稍微低头",
+    "PITCH_UP": "请稍微抬头",
+    "SWEEP_RIGHT_EAR": "请向左转头，慢慢找右耳最清楚的角度",
+    "SWEEP_LEFT_EAR": "请向右转头，慢慢找左耳最清楚的角度",
     "TURN_MORE": "再转一点点",
-    "TURN_BACK": "往回一点",
-    "SLOW_DOWN": "转慢一点",
-    "WRONG_SIDE": "方向反了，按提示的方向转",
-    "CLEAR_HAIR": "拨开耳边头发",
-    "HOLD_STILL": "很好，保持不动",
+    "TURN_BACK": "转得有点过了，往回一点",
+    "SLOW_DOWN": "请慢一点转",
+    "CLEAR_HAIR": "请把耳边头发拨开",
     "BAD_LIGHT": "光线不太好，换亮一点的地方",
-    "READY": "可以拍了"
+    "HOLD_NEAR_PEAK": "很好，请保持不动",
+    "READY": "可以拍了",
+    "SOFT_BEST": "已选当前最清晰角度",
+    "FAIL_TIMEOUT": "还没找到清晰角度，请拨开头发后再试一次",
+    "FAIL_TRACKING": "脸跟丢了，请正对屏幕后重新转头",
+    "WRONG_SIDE": "方向反了，请按提示的方向转头"
   }
 }

@@ -167,12 +167,51 @@ describe("pickPrompt priority", () => {
     ).toBe("SWEEP_RIGHT_EAR");
   });
 
-  it("HOLD_STILL until stable frames, then READY near a locked peak", () => {
+  it("HOLD_NEAR_PEAK until stable frames, then READY near a locked peak", () => {
     const best = peakAt(60);
     const hold = evaluateGuidance(base(), poseConfig, "rightEar", best, 3);
-    expect(hold.prompt).toBe("HOLD_STILL");
+    expect(hold.prompt).toBe("HOLD_NEAR_PEAK");
     expect(hold.allowCapture).toBe(false);
     const ready = evaluateGuidance(base(), poseConfig, "rightEar", best, 12);
+    expect(ready.prompt).toBe("READY");
+    expect(ready.allowCapture).toBe(true);
+    expect(poseConfig.ready.requireUserConfirm).toBe(false);
+  });
+
+  it("FAIL_TRACKING after a face was already seen", () => {
+    expect(
+      evaluateGuidance(
+        base({ hasFace: false }),
+        poseConfig,
+        "rightEar",
+        null,
+        0,
+        { hadTrackedFace: true },
+      ).prompt,
+    ).toBe("FAIL_TRACKING");
+  });
+
+  it("FAIL_TIMEOUT only when stuck with no peak — a 45° peak still READYs", () => {
+    const timedOut = evaluateGuidance(
+      base({ yaw: 0 }),
+      poseConfig,
+      "rightEar",
+      null,
+      12,
+      { searchElapsedMs: poseConfig.failure.timeoutMs, yawDelta: 0 },
+    );
+    expect(timedOut.prompt).toBe("FAIL_TIMEOUT");
+    expect(timedOut.allowCapture).toBe(false);
+
+    const best = peakAt(45);
+    const ready = evaluateGuidance(
+      base({ yaw: 45 }),
+      poseConfig,
+      "rightEar",
+      best,
+      12,
+      { searchElapsedMs: poseConfig.failure.timeoutMs, yawDelta: 0 },
+    );
     expect(ready.prompt).toBe("READY");
     expect(ready.allowCapture).toBe(true);
   });
@@ -187,6 +226,10 @@ describe("pickPrompt priority", () => {
 
 describe("quality-driven personal best yaw", () => {
   it("search window is |yaw| 35–90 and excludes near-frontal", () => {
+    expect(poseConfig.search.rightEar.yawAbsMax).toBe(90);
+    expect(poseConfig.search.leftEar.yawAbsMax).toBe(90);
+    expect(poseConfig.ready.bandDegAroundBest).toBe(5);
+    expect(poseConfig.captureMode).toBe("qualityPeakYaw");
     expect(yawInSearchWindow(45, "rightEar")).toBe(true);
     expect(yawInSearchWindow(35, "rightEar")).toBe(true);
     expect(yawInSearchWindow(90, "rightEar")).toBe(true);

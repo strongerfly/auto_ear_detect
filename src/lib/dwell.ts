@@ -41,10 +41,14 @@ function familyOf(prompt: PromptKey): Family {
     case "CLEAR_HAIR":
     case "BAD_LIGHT":
       return "quality";
-    case "HOLD_STILL":
+    case "HOLD_NEAR_PEAK":
+    case "SOFT_BEST":
       return "hold";
     case "READY":
       return "ready";
+    case "FAIL_TIMEOUT":
+    case "FAIL_TRACKING":
+      return "face";
   }
 }
 

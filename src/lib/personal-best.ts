@@ -1,6 +1,7 @@
 import type { EarSide, PoseConfig } from "../config";
 import { poseConfig } from "../config";
 import { frontalQualityScore } from "./quality";
+import { earSearch } from "./search-band";
 import type { EarQuality } from "./types";
 
 const STORAGE_KEY = "auto-ear-detect:best-yaw:v1";
@@ -43,7 +44,7 @@ export function loadPersonalBests(): PersonalBestMap {
 
 export function savePersonalBests(bests: PersonalBestMap): void {
   if (typeof localStorage === "undefined") return;
-  if (!poseConfig.personalBest.persist) return;
+  if (!poseConfig.personalBest.persistSessionOffset) return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(bests));
 }
 
@@ -53,7 +54,8 @@ export function yawInSearchWindow(
   config: PoseConfig = poseConfig,
 ): boolean {
   const abs = Math.abs(yaw);
-  if (abs < config.search.yawAbsMin || abs > config.search.yawAbsMax) {
+  const band = earSearch(side, config);
+  if (abs < band.yawAbsMin || abs > band.yawAbsMax) {
     return false;
   }
   return side === "rightEar" ? yaw > 0 : yaw < 0;
@@ -95,7 +97,7 @@ export function updatePersonalBest(
   if (!yawInSearchWindow(yaw, side, config)) return current;
   if (!poseOkForBest(pitch, roll, config)) return current;
 
-  const score = frontalQualityScore(quality, yaw, config);
+  const score = frontalQualityScore(quality, yaw, config, side);
   if (score < config.score.scoreMinAbsolute) return current;
 
   const minImprove = config.personalBest.minScoreImprove;
@@ -122,10 +124,11 @@ export function qualityNearPeak(
   peak: PeakSample | null,
   yaw: number | undefined,
   config: PoseConfig = poseConfig,
+  side: EarSide = "rightEar",
 ): boolean {
   if (!quality || !peak || peak.score <= 0) return false;
   return (
-    frontalQualityScore(quality, yaw, config) >=
+    frontalQualityScore(quality, yaw, config, side) >=
     peak.score * config.ready.scoreRatioOfBest
   );
 }

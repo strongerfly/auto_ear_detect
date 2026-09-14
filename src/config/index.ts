@@ -16,9 +16,12 @@ export type PromptKey =
   | "SLOW_DOWN"
   | "WRONG_SIDE"
   | "CLEAR_HAIR"
-  | "HOLD_STILL"
+  | "HOLD_NEAR_PEAK"
   | "BAD_LIGHT"
-  | "READY";
+  | "READY"
+  | "SOFT_BEST"
+  | "FAIL_TIMEOUT"
+  | "FAIL_TRACKING";
 
 export type PoseConfig = typeof poseConfigJson;
 
