@@ -2,6 +2,7 @@ import type { PromptKey, PoseConfig } from "../config";
 import type { EarQuality, EulerDeg } from "./types";
 import {
   classifyEarQuality,
+  frontalQualityScore,
   type QualityKind,
 } from "./quality";
 import {
@@ -29,11 +30,26 @@ export type GuidanceInput = {
 
 export type GuidanceExtras = {
   yawDelta?: number;
+  /** Signed per-frame Δyaw; used to detect returning toward bestYaw. */
+  yawDeltaSigned?: number;
+  /** Previous frame was inside the READY band (enter ±5° / leave ±8°). */
+  wasReady?: boolean;
   /** False when the ear ROI is mostly clipped. Undefined = unknown (simulator). */
   earInFrame?: boolean;
   /** Weak/flat peak: capture allowed, copy distinct from READY. */
   softPeak?: boolean;
 };
+
+export type CaptureUiState = "learning" | "hold" | "ready";
+
+export function captureUiFor(
+  locked: boolean,
+  allowCapture: boolean,
+): CaptureUiState {
+  if (allowCapture) return "ready";
+  if (locked) return "hold";
+  return "learning";
+}
 
 export type GuidanceResult = {
   prompt: PromptKey;
@@ -44,12 +60,54 @@ export type GuidanceResult = {
   allowCapture: boolean;
 };
 
-/** Progressive yaw hints. Unlocked: sweep only — never steer vs the prior. */
+function sameSignAsBest(yaw: number, bestYaw: number): boolean {
+  if (bestYaw === 0) return true;
+  return Math.sign(yaw) === Math.sign(bestYaw) || Math.abs(yaw) < 1;
+}
+
+/** Past the learned peak with a quality drop — ease back, don't keep turning. */
+function pastPeakOvershoot(
+  yaw: number,
+  t: EffectiveTargets,
+  quality: EarQuality | null,
+  config: PoseConfig,
+): boolean {
+  if (!t.locked || t.bestYaw === null) return false;
+  if (!sameSignAsBest(yaw, t.bestYaw)) return false;
+  const past =
+    Math.abs(yaw) > Math.abs(t.bestYaw) + config.search.overshootPastBestDeg;
+  if (!past) return false;
+  if (!quality || t.peakScore === null) return true;
+  return (
+    frontalQualityScore(quality, yaw, config) <
+    t.peakScore * config.ready.scoreRatioOfBest
+  );
+}
+
+function returningTowardBest(
+  yaw: number,
+  t: EffectiveTargets,
+  yawDeltaSigned: number,
+): boolean {
+  if (!t.locked || t.bestYaw === null) return false;
+  const err = yaw - t.bestYaw;
+  if (err === 0 || yawDeltaSigned === 0) return false;
+  return Math.sign(yawDeltaSigned) === -Math.sign(err);
+}
+
+/**
+ * Progressive yaw hints. Unlocked: SWEEP only — never steer vs the prior.
+ * Locked: overshoot vs bestYaw + score drop → TURN_BACK_OVERSHOOT;
+ * returning toward best → HOLD (NEAR_PEAK), not MORE.
+ */
 function pickYawPrompt(
   yaw: number,
   t: EffectiveTargets,
   yawDelta: number,
+  yawDeltaSigned: number,
   config: PoseConfig,
+  quality: EarQuality | null,
+  wasReady: boolean,
 ): PromptKey | null {
   if (t.side === "rightEar" && yaw < -8) return "WRONG_SIDE";
   if (t.side === "leftEar" && yaw > 8) return "WRONG_SIDE";
@@ -65,13 +123,24 @@ function pickYawPrompt(
 
   const err = yaw - t.yawCenter;
   const abs = Math.abs(err);
-  if (abs <= t.fineAbsError) return null;
+  const holdBand = wasReady
+    ? Math.max(t.fineAbsError, config.ready.exitBandDeg)
+    : t.fineAbsError;
+  if (abs <= holdBand) return null;
 
   if (
     yawDelta >= config.search.slowYawDeltaDeg &&
-    abs > t.fineAbsError
+    abs > holdBand
   ) {
     return "SLOW_DOWN";
+  }
+
+  if (returningTowardBest(yaw, t, yawDeltaSigned)) {
+    return "NEAR_PEAK";
+  }
+
+  if (pastPeakOvershoot(yaw, t, quality, config)) {
+    return "TURN_BACK_OVERSHOOT";
   }
 
   if (t.side === "rightEar") {
@@ -103,6 +172,7 @@ export function pickPrompt(
     input.roll,
     targets,
     config,
+    extras.wasReady === true,
   );
   const stable = stableFrames >= config.ready.stableFrames;
   const peak =
@@ -163,7 +233,10 @@ export function pickPrompt(
     input.yaw,
     targets,
     extras.yawDelta ?? 0,
+    extras.yawDeltaSigned ?? 0,
     config,
+    input.quality,
+    extras.wasReady === true,
   );
   if (yawHint === "WRONG_SIDE") {
     return { ...fail, prompt: yawHint, poseNear: false, poseReady: false };
@@ -217,7 +290,11 @@ export function pickPrompt(
   return { ...fail, prompt: "NEAR_PEAK" };
 }
 
-/** Dwell can lag the gate: never show READY/"hold still" on a gray shutter. */
+/**
+ * Dwell can lag the gate: never show READY on a gray shutter.
+ * HOLD_STILL is also remapped unless capture is already allowed — learning
+ * never uses hold-still; locked-near-peak uses NEAR_PEAK on the overlay.
+ */
 export function promptForDisplay(
   prompt: PromptKey,
   allowCapture: boolean,

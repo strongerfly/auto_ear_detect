@@ -17,9 +17,9 @@ export type AutoShutterStep = {
 };
 
 /**
- * Visible auto-shutter countdown. Fires once after READY is held for
- * `burstNeeded` frames and `countdownMs` have elapsed. Cancelled stays
- * off until the caller resets it (typically when READY drops).
+ * Visible auto-shutter countdown (`ready.autoshutterMs`). Fires once after
+ * READY is held for `burstNeeded` frames and `countdownMs` have elapsed.
+ * Cancelled stays off until the caller resets it (typically when READY drops).
  */
 export function stepAutoShutter(input: AutoShutterInput): AutoShutterStep {
   const idle: AutoShutterStep = {

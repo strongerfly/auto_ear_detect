@@ -17,7 +17,7 @@ import { useLocale } from "../i18n";
 import { countdownSeconds, stepAutoShutter } from "../lib/auto-shutter";
 import { dwellPrompt, INITIAL_DWELL, type DwellState } from "../lib/dwell";
 import { matrixToFiswgEuler } from "../lib/euler";
-import { evaluateGuidance, isAngleStable, promptForDisplay } from "../lib/guidance";
+import { captureUiFor, evaluateGuidance, isAngleStable, promptForDisplay } from "../lib/guidance";
 import {
   earInFrame,
   earRoiLayout,
@@ -119,6 +119,7 @@ export function EarCaptureApp() {
   const introUntilRef = useRef(sideIntroUntil(bootNow));
   const sweepRef = useRef(EMPTY_SWEEP);
   const capturedThisSideRef = useRef(false);
+  const wasReadyRef = useRef(false);
 
   sideRef.current = side;
   bestsRef.current = bests;
@@ -147,6 +148,7 @@ export function EarCaptureApp() {
     introUntilRef.current = sideIntroUntil(now);
     sweepRef.current = EMPTY_SWEEP;
     capturedThisSideRef.current = false;
+    wasReadyRef.current = false;
     setRelearnArmed(false);
     setLive({
       ...INITIAL_LIVE,
@@ -178,6 +180,13 @@ export function EarCaptureApp() {
   }, []);
 
   const personalBest = bests[side];
+  const captureUi = captureUiFor(personalBest !== null, live.allowCapture);
+  const captureHint =
+    captureUi === "ready"
+      ? t("READY")
+      : captureUi === "hold"
+        ? t("HOLD_STILL")
+        : t("learningNote");
   const promptText =
     live.captured && !live.stuck
       ? captureFeedback?.grade === "offPeak"
@@ -391,10 +400,11 @@ export function EarCaptureApp() {
       } else {
         stableFrames.current = 0;
       }
-      const yawDelta =
+      const yawDeltaSigned =
         lastAngles.current && angles
-          ? Math.abs(angles.yaw - lastAngles.current.yaw)
+          ? angles.yaw - lastAngles.current.yaw
           : 0;
+      const yawDelta = Math.abs(yawDeltaSigned);
       lastAngles.current = angles;
 
       if (hasFace && angles && quality) {
@@ -412,6 +422,7 @@ export function EarCaptureApp() {
           roll: angles.roll,
           quality,
           side: currentSide,
+          yawDelta,
         });
         if (nextPeak !== prevPeak) {
           const nextMap = { ...bestsRef.current, [currentSide]: nextPeak };
@@ -439,6 +450,8 @@ export function EarCaptureApp() {
         stableFrames.current,
         {
           yawDelta,
+          yawDeltaSigned,
+          wasReady: wasReadyRef.current,
           earInFrame: earVisible,
           softPeak: isSoftPeak(
             sweepRef.current,
@@ -446,6 +459,7 @@ export function EarCaptureApp() {
           ),
         },
       );
+      wasReadyRef.current = guidance.poseReady;
 
       const inIntro = now < introUntilRef.current;
       progressRef.current = stepProgress(progressRef.current, {
@@ -492,7 +506,7 @@ export function EarCaptureApp() {
         latched: shutterLatch.current,
         startedAt: countdownStartedAt.current,
         now,
-        countdownMs: poseConfig.ready.autoShutterCountdownMs,
+        countdownMs: poseConfig.ready.autoshutterMs,
         burstCount: readyBurst.current,
         burstNeeded: poseConfig.ready.burstFrames,
       });
@@ -718,6 +732,8 @@ export function EarCaptureApp() {
             type="button"
             className={`capture${live.softReady ? " soft" : ""}`}
             disabled={!live.allowCapture}
+            title={captureHint}
+            aria-label={captureHint}
             onClick={captureStill}
           >
             {t("capture")}
@@ -758,11 +774,7 @@ export function EarCaptureApp() {
       </div>
 
       <div className="dock">
-        <span className="calib-note">
-          {personalBest
-            ? t("learnedNote")
-            : t("learningNote")}
-        </span>
+        <span className="calib-note">{captureHint}</span>
         <button
           type="button"
           className={relearnArmed ? "ghost warn" : "ghost"}

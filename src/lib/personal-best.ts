@@ -65,6 +65,8 @@ export type BestYawSample = {
   roll: number;
   quality: EarQuality;
   side: EarSide;
+  /** Per-frame |Δyaw|. Fast turns do not update bestYaw even if quality looks easy. */
+  yawDelta?: number;
 };
 
 function poseOkForBest(
@@ -94,6 +96,7 @@ export function updatePersonalBest(
   const { yaw, pitch, roll, quality, side } = sample;
   if (!yawInSearchWindow(yaw, side, config)) return current;
   if (!poseOkForBest(pitch, roll, config)) return current;
+  if ((sample.yawDelta ?? 0) >= config.search.slowYawDeltaDeg) return current;
 
   const score = frontalQualityScore(quality, yaw, config);
   if (score < config.score.scoreMinAbsolute) return current;

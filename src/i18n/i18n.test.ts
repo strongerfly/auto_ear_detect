@@ -71,8 +71,14 @@ describe("string lookup", () => {
     expect(translate("en", "shootLeftEar")).toBe("Left ear");
     expect(translate("zh", "helpTitle")).toBe("使用说明");
     expect(translate("en", "helpTitle")).toBe("Instructions");
-    expect(translate("zh", "relearn")).toBe("重新学习此侧");
-    expect(translate("en", "relearn")).toBe("Relearn this side");
+    expect(translate("zh", "TURN_BACK_OVERSHOOT")).toBe(
+      "往回一点，刚才那边更清楚",
+    );
+    expect(translate("en", "TURN_BACK_OVERSHOOT")).toContain(
+      "it was clearer just now",
+    );
+    expect(translate("zh", "learningNote")).toContain("先慢转过头");
+    expect(translate("en", "learningNote").toLowerCase()).toContain("sweep slowly");
   });
 
   it("NEAR_PEAK does not tell the user to hold still", () => {

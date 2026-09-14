@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { poseConfig } from "../config";
-import { evaluateGuidance, promptForDisplay } from "./guidance";
+import { captureUiFor, evaluateGuidance, promptForDisplay } from "./guidance";
 import { dwellMsFor, dwellPrompt, INITIAL_DWELL } from "./dwell";
 import { effectiveTargets } from "./effective-targets";
 import {
@@ -447,6 +447,101 @@ describe("quality-driven personal best yaw", () => {
     );
     expect(r.allowCapture).toBe(false);
     expect(r.poseReady).toBe(false);
+  });
+
+  it("exitBandDeg hysteresis: 51° stays READY after entering at 45°", () => {
+    const best = peakAt(45);
+    const r = evaluateGuidance(
+      base({ yaw: 51, quality: sharp }),
+      poseConfig,
+      "rightEar",
+      best,
+      12,
+      { wasReady: true },
+    );
+    expect(r.poseReady).toBe(true);
+    expect(r.allowCapture).toBe(true);
+    expect(r.prompt).toBe("READY");
+  });
+
+  it("locked overshoot past bestYaw with a score drop is TURN_BACK_OVERSHOOT", () => {
+    const best = peakAt(45);
+    const r = evaluateGuidance(
+      base({ yaw: 80, quality: qualityAlongYawCurve(80, 45, sharp) }),
+      poseConfig,
+      "rightEar",
+      best,
+      12,
+    );
+    expect(r.allowCapture).toBe(false);
+    expect(r.prompt).toBe("TURN_BACK_OVERSHOOT");
+    expect(r.prompt).not.toBe("TURN_MORE");
+  });
+
+  it("returning toward bestYaw is HOLD (NEAR_PEAK), not TURN_MORE", () => {
+    const best = peakAt(45);
+    const r = evaluateGuidance(
+      base({ yaw: 60, quality: qualityAlongYawCurve(60, 45, sharp) }),
+      poseConfig,
+      "rightEar",
+      best,
+      0,
+      { yawDelta: 10, yawDeltaSigned: -10 },
+    );
+    expect(r.prompt).toBe("NEAR_PEAK");
+    expect(r.prompt).not.toBe("TURN_MORE");
+    expect(r.allowCapture).toBe(false);
+  });
+
+  it("fast-turn frames do not update bestYaw even if quality looks easy", () => {
+    const easy: EarQuality = { laplacian: 400, brightness: 120, edgeEnergy: 80 };
+    const first = updatePersonalBest(null, {
+      yaw: 45,
+      pitch: 0,
+      roll: 0,
+      quality: sharp,
+      side: "rightEar",
+      yawDelta: 0,
+    });
+    expect(first?.yaw).toBe(45);
+    const skipped = updatePersonalBest(first, {
+      yaw: 70,
+      pitch: 0,
+      roll: 0,
+      quality: easy,
+      side: "rightEar",
+      yawDelta: poseConfig.search.slowYawDeltaDeg,
+    });
+    expect(skipped?.yaw).toBe(45);
+    const stillNull = updatePersonalBest(null, {
+      yaw: 50,
+      pitch: 0,
+      roll: 0,
+      quality: easy,
+      side: "rightEar",
+      yawDelta: 20,
+    });
+    expect(stillNull).toBeNull();
+  });
+
+  it("grey capture UI is learning vs hold vs ready; never hold while learning", () => {
+    expect(captureUiFor(false, false)).toBe("learning");
+    expect(captureUiFor(true, false)).toBe("hold");
+    expect(captureUiFor(true, true)).toBe("ready");
+    const learning = evaluateGuidance(
+      base({ yaw: 45 }),
+      poseConfig,
+      "rightEar",
+      null,
+      12,
+    );
+    expect(learning.targets.locked).toBe(false);
+    expect(learning.prompt).not.toBe("HOLD_STILL");
+    expect(learning.prompt).not.toBe("TURN_MORE");
+    expect(learning.prompt).not.toBe("TURN_BACK");
+    expect(captureUiFor(learning.targets.locked, learning.allowCapture)).toBe(
+      "learning",
+    );
   });
 
   it("prior is a soft center until a peak is locked; 45 is not refused", () => {

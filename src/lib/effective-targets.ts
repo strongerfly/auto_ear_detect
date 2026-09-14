@@ -70,10 +70,14 @@ export function inReadyBand(
   roll: number,
   t: EffectiveTargets,
   config: PoseConfig,
+  wasReady = false,
 ): boolean {
   if (!t.locked || t.bestYaw === null) return false;
+  const enter = config.ready.bandDegAroundBest;
+  const exit = Math.max(enter, config.ready.exitBandDeg);
+  const band = wasReady ? exit : enter;
   return (
-    Math.abs(yaw - t.bestYaw) <= config.ready.bandDegAroundBest &&
+    Math.abs(yaw - t.bestYaw) <= band &&
     Math.abs(pitch) <= config.ready.pitchMaxAbs &&
     Math.abs(roll) <= config.ready.rollMaxAbs
   );

@@ -70,11 +70,11 @@ Euler 顺序为 **YXZ**（内旋 `R = Ry · Rx · Rz`），单位为**度**。4�
 
 1. 检测到人脸，尺寸在 `[minFaceHeightRatio, maxFaceHeightRatio]` 内
 2. 这一侧已经有 **bestYaw**
-3. 当前 yaw 在最佳附近 **±5°**，pitch/roll 在限内
+3. 当前 yaw 在最佳附近 **±5°**（离开用 **±8°** 滞回，`exitBandDeg`），pitch/roll 在限内
 4. 大约稳定 **12** 帧
 5. 分数 ≥ 该侧峰值的 **92%**，亮度在范围内
 
-没有「请确认耳朵已经正了」这一步。自动快门等 3 帧就绪后进入**可取消的倒计时**。**重新学习此侧**会再确认一次才清掉记住的峰值；学习本身是自动的。绝对角度 HUD 默认隐藏，只有打开 **调试：显示角度** 才出现。
+没有「请确认耳朵已经正了」这一步。峰值锁定前只扫转（不会按先验喊往回）。锁定后，过了 `bestYaw` 且分数掉了会说「往回一点，刚才那边更清楚」；往回走是保持，不是再转一点点。自动快门等 3 帧就绪后进入可取消的 **`autoshutterMs`** 倒数。**重新学习此侧**会再确认一次才清掉记住的峰值；学习本身是自动的。绝对角度 HUD 默认隐藏，只有打开 **调试：显示角度** 才出现。灰色快门会说明学习中 / 请保持 / 可以拍了——学习中不会说「保持不动」。`minSweepCoverageRatio` **不是** READY 硬门。
 
 ## 上限与短板
 
@@ -91,7 +91,9 @@ Euler 顺序为 **YXZ**（内旋 `R = Ry · Rx · Rz`），单位为**度**。4�
 | 想要… | 改这里 |
 |--------|--------|
 | 搜索 / 偏好带 | `search.yawAbsMin` / `yawAbsMax` / `preferredAbs*` |
-| 就绪 vs 个人峰值 | `ready.bandDegAroundBest`、`ready.scoreRatioOfBest` |
+| 就绪 vs 个人峰值 | `ready.bandDegAroundBest`、`ready.exitBandDeg`、`ready.scoreRatioOfBest` |
+| 过冲 | `search.overshootPastBestDeg` |
+| 自动快门倒数 | `ready.autoshutterMs`、`ready.burstFrames` |
 | 减少闪烁 | `promptUx.minDwellMs`、`crossFamilyDwellMs`、`slowDownPreemptMs`、`slowDownHoldMs`、`smoothing.oneEuro` |
 | 清晰度下限 | `score.sharp`、`score.struct` |
 | 文案 | `src/i18n/messages.ts` |

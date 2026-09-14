@@ -78,7 +78,7 @@ const zh: Messages = {
   SWEEP_LEFT_EAR: "拍左耳：慢慢向右转，找到耳朵最清楚的角度",
   TURN_MORE: "再转一点点",
   TURN_BACK: "往回一点，朝更清楚的那边",
-  TURN_BACK_OVERSHOOT: "到头了，往回一点",
+  TURN_BACK_OVERSHOOT: "往回一点，刚才那边更清楚",
   SLOW_DOWN: "转慢一点",
   WRONG_SIDE:
     "方向反了：拍右耳向左转，拍左耳向右转（身体的左右，不要跟着镜子）",
@@ -125,7 +125,7 @@ const zh: Messages = {
     "摄像头被拒绝了。请在浏览器设置里允许这个网站使用摄像头。",
   cameraOff: "摄像头未开启",
   previewHint: "前置预览像镜子 · 保存的照片不是",
-  learningNote: "慢慢转，系统会在后台自动找这侧最清楚的角度",
+  learningNote: "先慢转过头，系统会记住这侧最清楚的角度；转够之前拍摄按钮是灰的",
   learnedNote: "已记住此侧最清楚的角度",
   captured: "拍好了",
   hudBest: "最清楚",
@@ -153,7 +153,7 @@ const zh: Messages = {
   helpIntro: "语言切换在页头：中文 / English。",
   helpTurnHeading: "能做什么",
   helpTurnBody:
-    "用前置摄像头。先点「拍左耳」或「拍右耳」（身体的左右，不是镜子）。切换左右会重新引导这一侧，另一侧记住的角度还在。按提示慢慢转头，系统会记住这侧最清楚的角度。等到「可以拍了」再拍；默认开着自动快门，倒计时出现时可点「取消自动拍摄」。拍完可重拍或换另一只耳。",
+    "用前置摄像头。先点「拍左耳」或「拍右耳」（身体的左右，不是镜子）。切换左右会重新引导这一侧，另一侧记住的角度还在。按提示慢慢转头，系统会记住这侧最清楚的角度。过了最清楚的那边、画面变糊会说「往回一点，刚才那边更清楚」；往回走时先稳住，不要再转更侧。等到「可以拍了」再拍；默认开着自动快门，倒计时出现时可点「取消自动拍摄」。拍完可重拍或换另一只耳。",
   helpStuckHeading: "做不到",
   helpStuckBody:
     "不是医院耳镜。一次只拍一只耳朵，也不会检查你是不是点错了侧。头要大致摆正、稳住，脸在框里、距离合适。太暗或头发挡住会失败。只有侧着转头时才会学习——几乎正面或转到后脑勺都不算。预览像镜子，保存的照片不是。转了很久仍没更清楚时，会出现「再试一次 / 重新学习 / 拨开头发换亮一点」，不会只留一个灰色快门。",
@@ -175,7 +175,7 @@ const en: Messages = {
     "Left ear: turn slowly right until the ear looks clearest",
   TURN_MORE: "A little more",
   TURN_BACK: "Ease back toward the clearer pose",
-  TURN_BACK_OVERSHOOT: "That's as far as it goes — ease back",
+  TURN_BACK_OVERSHOOT: "Ease back a little — it was clearer just now",
   SLOW_DOWN: "Turn a bit slower",
   WRONG_SIDE:
     "Wrong way: right ear → turn left; left ear → turn right (your body, not the mirror)",
@@ -231,7 +231,7 @@ const en: Messages = {
   cameraOff: "Camera is off",
   previewHint: "Front preview is a mirror · saved photos are not",
   learningNote:
-    "Turn slowly — the app finds the clearest angle for this side in the background",
+    "Sweep slowly past the clearest angle first — capture stays grey until then",
   learnedNote: "Remembered the clearest angle for this side",
   captured: "Captured",
   hudBest: "Clearest",
@@ -259,7 +259,7 @@ const en: Messages = {
   helpIntro: "Language switching is in the page header: 中文 / English.",
   helpTurnHeading: "Can",
   helpTurnBody:
-    "Use the front camera. Tap Left ear or Right ear first (your body, not the mirror). Switching sides restarts guidance for that ear and keeps the other side’s remembered angle. Turn slowly as prompted — the app remembers the clearest angle for that side. Shoot when it says Ready; auto-shutter is on by default and shows a countdown you can cancel. After a shot you can retake or switch ears.",
+    "Use the front camera. Tap Left ear or Right ear first (your body, not the mirror). Switching sides restarts guidance for that ear and keeps the other side’s remembered angle. Turn slowly as prompted — the app remembers the clearest angle for that side. If you go past it and it gets worse, you’ll see “ease back a little — it was clearer just now.” While you return, hold; don’t keep turning farther. Shoot when it says Ready; auto-shutter is on by default and shows a countdown you can cancel. After a shot you can retake or switch ears.",
   helpStuckHeading: "Cannot",
   helpStuckBody:
     "Not a clinical ear scanner. One ear at a time, and it won’t check that you picked the correct side. Keep your head roughly upright and steady, face in frame, at a comfortable distance. Dark scenes or hair over the ear fail. It only learns while you turn to the side — not almost frontal, not past the back of the head. The preview is a mirror; the saved photo is not. If nothing gets clearer for a while, you’ll get Try again / Relearn / tuck hair and find better light — not a dead grey shutter.",
