@@ -18,7 +18,10 @@ export type DwellUx = {
   readyPromoteMs?: number;
   /** Immediate switch from SWEEP/TURN_MORE onto SLOW_DOWN (QA: fast-turn hint). */
   slowDownPreemptMs?: number;
-  /** Keep SLOW_DOWN on screen after Δyaw settles, so a one-frame spike is readable. */
+  /**
+   * Short on-screen window after Δyaw settles, then yield back to SWEEP/TURN_MORE.
+   * Must stay below minDwellMs so yaw-family dwell does not pin 「转慢一点」.
+   */
   slowDownHoldMs?: number;
 };
 
@@ -91,7 +94,9 @@ export function dwellMsFor(
     return ux.slowDownPreemptMs ?? 0;
   }
   if (from === "SLOW_DOWN" && isKeepTurning(to)) {
-    return ux.slowDownHoldMs ?? ux.minDwellMs;
+    // Same yaw family as SWEEP_*; use the short promote window (not minDwell)
+    // so 「转慢一点」 does not stick and block useful sweep guidance.
+    return ux.slowDownHoldMs ?? ux.readyPromoteMs ?? 200;
   }
   if (to === "READY" || to === "SOFT_READY" || to === "STUCK_NO_PROGRESS") {
     return ux.readyPromoteMs ?? 200;
@@ -100,7 +105,7 @@ export function dwellMsFor(
   return ux.crossFamilyDwellMs ?? ux.minDwellMs;
 }
 
-/** Hold a prompt before switching (anti-flicker). READY promotes faster; SLOW_DOWN preempts SWEEP. */
+/** Hold a prompt before switching (anti-flicker). READY promotes faster; SLOW_DOWN preempts SWEEP then yields quickly. */
 export function dwellPrompt(
   state: DwellState,
   picked: PromptKey,

@@ -50,7 +50,7 @@ Head pose from MediaPipe is for **direction**. Ear-ROI sharpness/structure is ho
 5. Ear score ≥ **92%** of the side’s peak; brightness 60–200  
 6. No yaw ∈ [70, 90] requirement; no user confirm  
 
-Guidance is one short line (中文 / English in the app). Switching left/right resets shutter, dwell, and guidance and shows a body-side intro; the other side’s stored peak is kept. While the peak is still unknown we only ask the user to turn slowly (no “a little more / ease back” vs a prior angle). Near a locked peak but not yet stable we do **not** say “hold still” while capture is still blocked. READY promotes faster so prompts do not feel like a checklist. After a shot, feedback is relative to the remembered peak (no absolute degrees), with retake / other ear. Absolute yaw/pitch/roll numbers stay behind a debug toggle.
+Guidance is one short line (中文 / English in the app). Switching left/right resets shutter, dwell, and guidance and shows a body-side intro; the other side’s stored peak is kept. While the peak is still unknown we only ask the user to turn slowly (no “a little more / ease back” vs a prior angle). `SLOW_DOWN` can preempt a sweep line on a fast yaw jump, then yields back to SWEEP on a short window (`slowDownHoldMs`, same idea as READY’s `readyPromoteMs`) so 「转慢一点」 does not sit for a full yaw-family `minDwellMs`. Near a locked peak but not yet stable we do **not** say “hold still” while capture is still blocked. READY promotes faster so prompts do not feel like a checklist. After a shot, feedback is relative to the remembered peak (no absolute degrees), with retake / other ear. Absolute yaw/pitch/roll numbers stay behind a debug toggle.
 
 ## Leftover cannot-do (this pass)
 
