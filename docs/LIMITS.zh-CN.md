@@ -40,11 +40,12 @@ Capture mode: `qualityPeakYaw`（`src/config/pose-config.json`）。READY **不�
 - 分数 = **0.45 Laplacian + 0.35 边缘 + 0.20 侧脸内容**。`bestYaw` 是跑分最高时的 yaw；近同分走 `smallerAbsYaw`。
 - **READY**（同时满足）：脸在框里、距离 OK；这一侧已锁 `bestYaw`；当前 yaw 在最佳 **±5°**（`bandDegAroundBest` 进入带，**不是** 8）。`exitBandDeg` **8°** 只是滞后，防止 READY 闪烁，不是更宽的进入门。pitch/roll 在限内；约 **12** 帧稳定；分数 ≥ 峰值 **92%**；亮度 60–200。**没有** yaw ∈ [70, 90]。**没有**「请确认耳朵正了」。
 - 还在学习（未锁峰）：**只有扫掠引导**——60° 先验不会触发「再转一点点 / 往回一点 / 保持不动」。
-- 锁峰后转过头：朝**个人**峰值 TURN_BACK；窗口外沿「到头了，往回一点」。
-- 脸跟丢：暂停打分，**保留** `bestYaw`，回来再往峰值靠。
-- 自动快门可选（**默认关**）。READY 之后用 **3 帧缓冲选最高分**（`ready.pickBurstBy: "score"`）。手动拍在缓冲热了时同样选最高分。
-- 平时界面**不显示**绝对目标角度（调试折叠里才有）。
-- 文案在 `src/i18n/` 中英切换。「重新学习此侧」确认后清峰值。
+- 锁峰后转过头：过个人峰值约 **6°+** 才 TURN_BACK（不是只看 \|yaw\|>88）；从过头一侧往峰值靠近时 **HOLD**（不是 TURN_MORE）；窗口外沿「到头了，往回一点」。文案：「往回一点，刚才那边更清楚」。
+- 脸跟丢：暂停打分和稳定计数，**保留** `bestYaw`，回来再往峰值靠。
+- 自动快门可选（**默认关**）：**idle → countdown → fire → cooldown**；取消回到 idle。READY 之后用 **3 帧缓冲选最高分**（`ready.pickBurstBy: "score"`）。手动拍在缓冲热了时同样选最高分。
+- 软最佳（已记住、还不能拍）和绿色 READY **外观不同**。页脚 `limitsHint` 短句。平时界面**不显示**绝对目标角度（调试折叠里才有）。
+- 文案在 `src/i18n/` 中英同一套 key。「重新学习此侧」确认后清峰值并重新扫掠。
+- 耳区 ROI 出框且靠近峰值 → 太近/出画（`TOO_CLOSE`）。多人脸 `MULTI_FACE`。`WRONG_SIDE` 要连续 `wrongSideFrames`（8）帧。
 
 ---
 
@@ -57,8 +58,8 @@ Capture mode: `qualityPeakYaw`（`src/config/pose-config.json`）。READY **不�
 - 大侧面跟丢时，`bestYaw` 可能停在窗口**内侧**（约 35–45°），即使更外头还有更好姿势。
 - 笔记本 vs 手机 FOV：同一人可能笔记本 45°、手机 70°；我们会学，但不能承诺度数可移植。
 - Burst 只是 **3 帧未对齐的整帧、取最高分**——不是对齐超分，也不是 JPEG 堆叠融合。
-- `minSweepCoverageRatio`（0.6）写在配置里，**故意不当 READY 硬门**（否则 45° 停住的清晰耳会被逼去转满窗）。
-- 下次会话的 `clampOffsetDeg` / 收窄 10° **没启用**（旧峰值 80° 会把新的 45° 拒掉）。
+- `minSweepCoverageRatio`（0.6）只卡住**弱峰值**冷启动。**自信的 ~45°** 峰值（`ready.confidentPeakScore`）不必扫满 60% 窗也能 READY。硬 60% 门会挡住这种停住——见卡点 / 条件。
+- 下次会话的 `clampOffsetDeg` / 收窄 10° **没启用**（故意不用；旧峰值 80° 会把新的 45° 拒掉）。
 - Face Landmarker 在主线程，可能卡一下；还没有 Worker。
 - CI 没有真机摄像头 E2E（只有单测 + 模拟器）。
 
@@ -109,10 +110,11 @@ Capture mode: `qualityPeakYaw`（`src/config/pose-config.json`）。READY **不�
 - **固定 70–90° READY：** 已弃用。位姿只做转向提示；READY 看个人 bestYaw。
 - **问用户「你是不是 45° 那种」：** 不做。转头过程里自动记峰值。
 - **专用耳 landmark / 3D 耳：** 未接。MediaPipe 脸部耳点在侧脸上不可靠，所以用头部位姿 + ROI 质量。触发条件：有稳定侧脸耳分割模型且延迟可接受。
-- **扫过窗口 60% 才允许 READY：** 配了 `minSweepCoverageRatio`，**故意不作为硬门**。否则 45° 附近停住的清晰耳会被逼去转满窗。只在文档里当「假峰风险」说明。
+- **扫过窗口 60% 才允许 READY：** 配了 `minSweepCoverageRatio`。**弱峰值**冷启动必须继续扫；**自信的 ~45°** 峰值仍可 READY。对每一次 READY 都硬卡 60% 是遗留（卡点：假峰 vs 真 45° 耳廓；条件：按角度标注的耳数据集）。
 - **45s 超时失败文案：** `FAIL_TIMEOUT` 只在**一直没学到峰值且几乎停住**时出现；有 45° 峰值时仍可 READY，不当主路径催促。
 - **外耳道暗斑惩罚：** 用 ROI 中心亮度做了很弱的启发；没有分割时分不清 meatus 和头发阴影。
-- **Burst 按分数选帧：** 最近 **3 帧 READY 图**里留分数最高的一张。不是对齐融合。
+- **Burst 按分数选帧：** 最近 **3 帧 READY 图**里留分数最高的一张。不是对齐融合（卡点：帧间运动；条件：对齐算力预算）。
+- **`clampOffsetDeg` 故意不用：** 下次把搜索收到旧峰值 ±10° 会把新的 45° 在旧 80° 之后拒掉（卡点：FOV/发型变化；条件：同一人同一设备，且通过 45° 验收）。
 
 ## 不做（Won't do）
 
@@ -136,6 +138,6 @@ Capture mode: `qualityPeakYaw`（`src/config/pose-config.json`）。READY **不�
 
 `src/lib/guidance.test.ts` 里 `interaction coverage (coherent pass)` 以及原有套件锁住：
 
-转不够 → TURN_MORE；过了**个人**峰值 → TURN_BACK；往峰值靠近时 HOLD（不是 TURN_MORE）；两侧 WRONG_SIDE；roll 再 pitch 再 yaw；头发 / 过亮 / 转太快；脸跟丢**保留** `bestYaw`；太近/太远；平坦分数曲线仍按更小 \|yaw\| READY；重新学习（峰值清空）走扫掠不能拍；~45° 峰值可以拍；单独 70–90 不能拍。
+转不够 → TURN_MORE；过个人 bestYaw **约 6°+** → TURN_BACK（「往回一点，刚才那边更清楚」）；从过头一侧往峰值靠近 HOLD（不是 TURN_MORE）；两侧 WRONG_SIDE（`wrongSideFrames`）；roll 再 pitch 再 yaw；头发 / 过亮 / 转太快（`fastTurnDegPerFrame`）；脸跟丢**保留** `bestYaw`；太近/太远；ROI 出框靠近峰值 → TOO_CLOSE；MULTI_FACE；平坦分数曲线仍按更小 \|yaw\| READY；重新学习（峰值清空）走扫掠不能拍；~45° 峰值可以拍；单独 70–90 不能拍；弱冷启动峰值没扫够不能拍；自动快门 idle→countdown→fire→cooldown。
 
-**不当硬门（见短板）：** `minSweepCoverageRatio` 0.6、`flatPeakRangeDeg` 25（用近同分 + 92% 分）、没有单独的 ROI 出框提示（太近 / 靠近峰值时 CLEAR_HAIR）、`wrongSideFrames`（400ms 停留当去抖）。
+**不当硬门（见短板 / 卡点 / 条件）：** 对**自信** 45° 峰值仍卡 60% 覆盖；`flatPeakRangeDeg` 25（用近同分 + 92% 分）；`clampOffsetDeg` 未启用；对齐 burst 融合；耳分割；按设备 Laplacian。

@@ -29,9 +29,14 @@ export type GuidanceInput = {
 
 export type GuidanceExtras = {
   yawDelta?: number;
+  /** Signed frame-to-frame yaw change; negative = turning left (toward a +yaw peak). */
+  signedYawDelta?: number;
   hadTrackedFace?: boolean;
   searchElapsedMs?: number;
   wasPoseReady?: boolean;
+  sweepCoverageRatio?: number;
+  wrongSideStreak?: number;
+  roiOutOfFrame?: boolean;
 };
 
 export type GuidanceResult = {
@@ -44,6 +49,22 @@ export type GuidanceResult = {
   phase: "learning" | "hold" | "ready";
 };
 
+/** Weak cold-start peaks need a real sweep; a confident ~45° peak can still READY. */
+function coverageAllowsReady(
+  targets: EffectiveTargets,
+  extras: GuidanceExtras,
+  config: PoseConfig,
+): boolean {
+  const cov = extras.sweepCoverageRatio;
+  if (cov === undefined) return true;
+  if (cov >= config.search.minSweepCoverageRatio) return true;
+  return (
+    targets.locked &&
+    targets.peakScore !== null &&
+    targets.peakScore >= (config.ready.confidentPeakScore ?? 0.5)
+  );
+}
+
 /** Progressive yaw hints. Unlocked = sweep only; TURN_BACK only after a peak. */
 function pickYawPrompt(
   yaw: number,
@@ -51,11 +72,18 @@ function pickYawPrompt(
   yawDelta: number,
   config: PoseConfig,
   wasReady: boolean,
+  extras: GuidanceExtras = {},
 ): PromptKey | null {
-  if (t.side === "rightEar" && yaw < -8) return "WRONG_SIDE";
-  if (t.side === "leftEar" && yaw > 8) return "WRONG_SIDE";
+  const wrongSide =
+    (t.side === "rightEar" && yaw < -8) || (t.side === "leftEar" && yaw > 8);
+  const wrongNeed = config.failure.wrongSideFrames ?? 1;
+  if (wrongSide && (extras.wrongSideStreak ?? wrongNeed) >= wrongNeed) {
+    return "WRONG_SIDE";
+  }
 
-  if (yawDelta >= config.search.slowYawDeltaDeg) {
+  const fastTurn =
+    config.search.fastTurnDegPerFrame ?? config.search.slowYawDeltaDeg;
+  if (yawDelta >= fastTurn) {
     return "SLOW_DOWN";
   }
 
@@ -65,13 +93,29 @@ function pickYawPrompt(
 
   const err = yaw - t.yawCenter;
   const abs = Math.abs(err);
-  const inBand = wasReady
-    ? abs <= (config.ready.exitBandDeg ?? t.fineAbsError)
-    : abs <= t.fineAbsError;
+  const exitBand = config.ready.exitBandDeg ?? t.fineAbsError;
+  const inBand = wasReady ? abs <= exitBand : abs <= t.fineAbsError;
   if (inBand) return null;
 
   if (Math.abs(yaw) >= config.failure.stuckNearOuterEdgeDeg) {
     return "TURN_BACK_OVERSHOOT";
+  }
+
+  const overshootSide = t.side === "rightEar" ? err > 0 : err < 0;
+  const signed = extras.signedYawDelta;
+  const towardPeak =
+    signed !== undefined &&
+    ((err > 0 && signed < 0) || (err < 0 && signed > 0));
+  const overshootDeg = config.search.overshootTurnBackDeg ?? 6;
+
+  // Approaching the personal peak from the overshoot side → HOLD, not TURN_MORE.
+  if (overshootSide && towardPeak && abs <= exitBand) {
+    return null;
+  }
+
+  // Past personal bestYaw by ~6°+ (not merely |yaw|>88) → TURN_BACK.
+  if (overshootSide && abs >= overshootDeg) {
+    return "TURN_BACK";
   }
 
   if (t.side === "rightEar") {
@@ -170,6 +214,9 @@ export function pickPrompt(
   if (closeOnYaw && input.pitch < config.poseGuidance.pitchTooLowBelow) {
     return { ...fail, prompt: "PITCH_UP", poseNear: false, poseReady: false };
   }
+  if (extras.roiOutOfFrame && closeOnYaw) {
+    return { ...fail, prompt: "TOO_CLOSE", poseNear: false, poseReady: false };
+  }
 
   const yawHint = pickYawPrompt(
     input.yaw,
@@ -177,6 +224,7 @@ export function pickPrompt(
     extras.yawDelta ?? 0,
     config,
     extras.wasPoseReady ?? false,
+    extras,
   );
   if (yawHint) {
     return { ...fail, prompt: yawHint, poseNear: false, poseReady: false };
@@ -202,9 +250,27 @@ export function pickPrompt(
   }
 
   const allowCapture =
-    poseReady && stable && qualityKind === "ok" && nearPeakScore;
+    poseReady &&
+    stable &&
+    qualityKind === "ok" &&
+    nearPeakScore &&
+    coverageAllowsReady(targets, extras, config);
   if (allowCapture) {
     return { ...fail, prompt: "READY", allowCapture: true, phase: "ready" };
+  }
+  if (
+    poseReady &&
+    stable &&
+    qualityKind === "ok" &&
+    nearPeakScore &&
+    !coverageAllowsReady(targets, extras, config)
+  ) {
+    return {
+      ...fail,
+      prompt:
+        targets.side === "rightEar" ? "SWEEP_RIGHT_EAR" : "SWEEP_LEFT_EAR",
+      phase: "learning",
+    };
   }
   if (!targets.locked) {
     return {

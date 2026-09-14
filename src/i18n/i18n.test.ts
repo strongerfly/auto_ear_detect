@@ -10,7 +10,9 @@ import {
 } from "./locale";
 import {
   interpolate,
+  INTRO_PROMPT_KEYS,
   looksLikeRigidAngleChecklist,
+  messagesFor,
   translate,
   userFacingKeys,
 } from "./messages";
@@ -65,6 +67,12 @@ describe("string lookup", () => {
     }
   });
 
+  it("keeps zh and en tables on the same keys", () => {
+    expect(Object.keys(messagesFor("zh")).sort()).toEqual(
+      Object.keys(messagesFor("en")).sort(),
+    );
+  });
+
   it("updates UI chrome when the locale switches", () => {
     expect(translate("zh", "shootLeftEar")).toBe("拍左耳");
     expect(translate("en", "shootLeftEar")).toBe("Left ear");
@@ -83,6 +91,17 @@ describe("string lookup", () => {
       expect(looksLikeRigidAngleChecklist(translate("zh", key))).toBe(false);
       expect(looksLikeRigidAngleChecklist(translate("en", key))).toBe(false);
     }
+  });
+
+  it("INTRO sweep copy has no naked target degrees", () => {
+    for (const key of INTRO_PROMPT_KEYS) {
+      expect(translate("zh", key)).not.toMatch(/\d+\s*°/);
+      expect(translate("en", key)).not.toMatch(/\d+\s*°/);
+    }
+    expect(translate("zh", "limitsHint")).not.toMatch(/\d+\s*°/);
+    expect(translate("en", "limitsHint")).not.toMatch(/\d+\s*°/);
+    expect(translate("zh", "TURN_BACK")).toContain("往回一点");
+    expect(translate("zh", "autoshutterCountdown")).toContain("{n}");
   });
 
   it("help describes auto-learn, header language switch, and turn pairing", () => {

@@ -40,11 +40,12 @@ What works **reliably today** in the browser, with a webcam or the pose simulato
 - Score = **0.45 Laplacian + 0.35 edge energy + 0.20 side-face content**. `bestYaw` is the yaw at the running max; near-ties use `smallerAbsYaw`.
 - **READY** (all of): face in frame and size OK; this side has a locked `bestYaw`; current yaw within **±5°** of that best (`bandDegAroundBest` / enter band — **not** 8). `exitBandDeg` **8°** is hysteresis so READY does not flicker; it is not a wider enter gate. Pitch/roll in ready limits; ~**12** stable frames; score ≥ **92%** of the personal peak; brightness 60–200. **No** yaw ∈ [70, 90]. **No** “confirm the ear is frontal”.
 - Unlocked (still learning): **sweep intro only** — a 60° prior never fires TURN_MORE / TURN_BACK / HOLD.
-- Locked overshoot: TURN_BACK toward the **personal** peak; outer-edge “到头了，往回一点”.
-- Face lost: pause scoring, **keep** `bestYaw`, recover toward the peak.
-- Autoshutter optional (default **off**). After READY, a **3-frame buffer picks the highest score** (`ready.pickBurstBy: "score"`). Manual Capture uses the same pick when the buffer is warm.
-- Absolute target yaw is **not** shown in the normal UI (debug disclosure only).
-- zh / en copy in `src/i18n/`. Relearn clears the stored peak after confirm.
+- Locked overshoot: TURN_BACK toward the **personal** peak when past bestYaw by ~**6°+** (not merely \|yaw\|>88); approaching the peak from the overshoot side **HOLDs** (not TURN_MORE); outer-edge “到头了，往回一点”.
+- Face lost: pause scoring and stability, **keep** `bestYaw`, recover toward the peak.
+- Autoshutter optional (default **off**): **idle → countdown → fire → cooldown**; cancel returns idle. After READY, a **3-frame buffer picks the highest score** (`ready.pickBurstBy: "score"`). Manual Capture uses the same pick when the buffer is warm.
+- Soft-best (learned peak, not yet READY) is visually distinct from green READY. Footer `limitsHint` is a 短句; absolute target yaw is **not** shown in the normal UI (debug disclosure only).
+- zh / en copy in `src/i18n/` (same keys). Relearn clears the stored peak after confirm and resweeps.
+- Ear ROI clipped out of frame near the peak → too close / out (`TOO_CLOSE`). `MULTI_FACE` when more than one face is tracked. `WRONG_SIDE` waits `wrongSideFrames` (8).
 
 ---
 
@@ -57,8 +58,8 @@ Gaps versus an ideal “always finds the true frontal ear”:
 - Tracker loss at deep profile can pin `bestYaw` on the **inner edge** of the window (~35–45°) even if a better pose exists further out.
 - Laptop vs phone FOV: the same person can peak at 45° on a laptop and 70° on a phone; we learn that, but we cannot promise a portable degree.
 - Burst fusion is **three unsynced full frames, pick max score** — not aligned multi-frame super-resolution, not JPEG stack fusion.
-- `minSweepCoverageRatio` (0.6) is in config and **intentionally not a hard READY gate** (it would block a clear 45° hold).
-- Next-session `clampOffsetDeg` / narrow-by-10° is **not** applied for the same reason (would refuse a new 45° after an old 80°).
+- `minSweepCoverageRatio` (0.6) is a **weak-peak** cold-start gate only. A **confident ~45°** peak (`ready.confidentPeakScore`) can still READY without covering 60% of the window. A hard 60% gate would block that hold — leftover, see 卡点 / 条件.
+- Next-session `clampOffsetDeg` / narrow-by-10° is **not** applied (unused on purpose; would refuse a new 45° after an old 80°).
 - Main-thread Face Landmarker can hitch; no worker yet.
 - No camera E2E guarantee in CI (unit tests + simulator only).
 
@@ -109,10 +110,11 @@ These are the gates before the next optimizations are honest, not aspirational:
 - **Fixed 70–90 READY:** removed. Pose is guidance; READY is personal bestYaw.
 - **Ask “are you a 45° person?”:** will not. Peak is learned during a normal turn.
 - **Dedicated ear landmarks / 3D ear:** not wired. Face-mesh ear points are unreliable in profile, so we use head pose + ROI quality. Trigger: a stable profile ear-seg model within the latency budget.
-- **Require 60% window coverage before READY:** `minSweepCoverageRatio` is in config and **intentionally not a hard gate**, so a clear ear that peaks at ~45° can still READY. Documented as false-peak risk.
+- **Require 60% window coverage before READY:** `minSweepCoverageRatio` is in config. **Weak** cold-start peaks must keep sweeping; a **confident ~45°** peak still READYs. A hard 60% gate on every READY is leftover (卡点: false-peak vs a real 45° pinna; 条件: labeled ear-angle set).
 - **45s timeout fail copy:** `FAIL_TIMEOUT` only if **no peak is locked and the user has stopped turning**. A 45° peak can still READY after a long session; it is recovery copy, not the main path.
 - **Meatus-like dark-blob penalty:** weak center-brightness heuristic only. Without seg we cannot tell meatus from hair shadow.
-- **Burst pick-by-score:** last **3 READY frames**, keep the highest score still. Not aligned fusion.
+- **Burst pick-by-score:** last **3 READY frames**, keep the highest score still. Not aligned fusion (卡点: inter-frame motion; 条件: align budget).
+- **`clampOffsetDeg` unused on purpose:** narrowing next session to last peak ±10° would refuse a new 45° after an 80° session (卡点: FOV / haircut change; 条件: same person + device and a 45° acceptance test).
 
 ## Won't do
 
@@ -136,6 +138,6 @@ Guidance is one short line (中文 / English in the app). While the user is stil
 
 Unit tests in `src/lib/guidance.test.ts` (`interaction coverage (coherent pass)` plus the older suites) lock:
 
-under-rotate → TURN_MORE; over-rotate past **personal** best → TURN_BACK; approaching the peak HOLDs (not TURN_MORE); wrong-side both ears; roll then pitch then yaw; hair / too-bright / too-fast; face lost **keeps** `bestYaw`; too near/far; flat score curve still READYs at the smaller \|yaw\|; relearn (null peak) is sweep not READY; ~45° peak READYs; 70–90 alone does not.
+under-rotate → TURN_MORE; over-rotate **6°+ past personal bestYaw** → TURN_BACK (copy「往回一点，刚才那边更清楚」); approaching the peak from overshoot HOLDs (not TURN_MORE); wrong-side both ears (`wrongSideFrames`); roll then pitch then yaw; hair / too-bright / too-fast (`fastTurnDegPerFrame`); face lost **keeps** `bestYaw`; too near/far; ROI clipped near peak → TOO_CLOSE; MULTI_FACE; flat score curve still READYs at the smaller \|yaw\|; relearn (null peak) is sweep not READY; ~45° peak READYs; 70–90 alone does not; weak cold-start peak without sweep coverage is not READY; autoshutter idle→countdown→fire→cooldown.
 
-**Not a hard gate (see 短板):** `minSweepCoverageRatio` 0.6, `flatPeakRangeDeg` 25 (tie-break + 92% score ratio instead), ROI-clipped ear with no dedicated prompt (too-close / CLEAR_HAIR when near peak), `wrongSideFrames` (400ms dwell is the debounce).
+**Not a hard gate (see 短板 / 卡点 / 条件):** 60% coverage on a **confident** 45° peak; `flatPeakRangeDeg` 25 (tie-break + 92% score ratio instead); `clampOffsetDeg` unused; aligned burst fusion; ear-seg; device Laplacian.

@@ -46,12 +46,17 @@ export function meanVisibility(landmarks: Landmark[]): number {
   return n === 0 ? 1 : sum / n;
 }
 
-export function earRoiBox(
+export type EarRoiResult = {
+  box: RoiBox;
+  clipped: boolean;
+};
+
+export function measureEarRoi(
   landmarks: Landmark[],
   side: "leftEar" | "rightEar",
   width: number,
   height: number,
-): RoiBox | null {
+): EarRoiResult | null {
   const idx = side === "leftEar" ? LEFT_EAR_LANDMARKS : RIGHT_EAR_LANDMARKS;
   const pts: { x: number; y: number }[] = [];
   for (const i of idx) {
@@ -77,7 +82,6 @@ export function earRoiBox(
   const padX = bw * 0.55;
   const padY = bh * 0.7;
 
-  // Expand away from the face center (outward along the ear).
   if (side === "leftEar") {
     maxX += padX;
     minX -= padX * 0.25;
@@ -88,10 +92,22 @@ export function earRoiBox(
   minY -= padY;
   maxY += padY;
 
+  const clipped =
+    minX < 0 || minY < 0 || maxX > width || maxY > height;
+
   const x = Math.max(0, Math.floor(minX));
   const y = Math.max(0, Math.floor(minY));
   const w = Math.min(width - x, Math.ceil(maxX) - x);
   const h = Math.min(height - y, Math.ceil(maxY) - y);
   if (w < 8 || h < 8) return null;
-  return { x, y, w, h };
+  return { box: { x, y, w, h }, clipped };
+}
+
+export function earRoiBox(
+  landmarks: Landmark[],
+  side: "leftEar" | "rightEar",
+  width: number,
+  height: number,
+): RoiBox | null {
+  return measureEarRoi(landmarks, side, width, height)?.box ?? null;
 }

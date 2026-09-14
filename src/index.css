@@ -165,23 +165,8 @@ h1 {
   box-shadow: 0 0 0 2px var(--accent-dim);
 }
 
-.cam,
-.overlay {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  /* Front-camera selfie preview. Inference uses the unmirrored video buffer. */
-  transform: scaleX(-1);
-}
-
-.overlay {
-  pointer-events: none;
-}
-
-.scratch {
-  display: none;
+.stage.learned:not(.ready) {
+  border-color: #8a7340;
 }
 
 .prompt {
@@ -199,9 +184,40 @@ h1 {
   transform: none;
 }
 
+.prompt[data-soft-best="true"] {
+  color: #f3e2a8;
+  background: rgba(40, 32, 12, 0.78);
+}
+
 .prompt[data-ready="true"] {
   color: #06241c;
   background: var(--accent);
+}
+
+.shutter-count {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.55em;
+  font-weight: 650;
+}
+
+.cam,
+.overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  /* Front-camera selfie preview. Inference uses the unmirrored video buffer. */
+  transform: scaleX(-1);
+}
+
+.overlay {
+  pointer-events: none;
+}
+
+.scratch {
+  display: none;
 }
 
 .stage-tag {
@@ -315,6 +331,16 @@ h1 {
 .calib-note {
   color: var(--muted);
   font-size: 13px;
+}
+
+.calib-note.soft-best {
+  color: #e6c86a;
+}
+
+.limits-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .preview {

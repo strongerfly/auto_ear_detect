@@ -55,7 +55,9 @@ type UiMessageKey =
   | "debugHudSummary"
   | "relearnConfirm"
   | "autoshutterCancel"
-  | "otherEarHint";
+  | "autoshutterCountdown"
+  | "otherEarHint"
+  | "limitsHint";
 
 export type MessageKey = PromptKey | UiMessageKey;
 
@@ -68,6 +70,7 @@ const zh: Messages = {
   FIX_ROLL: "头摆正一点，不要歪",
   PITCH_DOWN: "稍微低头",
   PITCH_UP: "稍微抬头",
+  // INTRO_* — guidance emits SWEEP_*; no naked target degrees.
   SWEEP_RIGHT_EAR: "拍右耳：慢慢向左转，找到耳朵最清楚的角度",
   SWEEP_LEFT_EAR: "拍左耳：慢慢向右转，找到耳朵最清楚的角度",
   TURN_MORE: "再转一点点",
@@ -142,7 +145,9 @@ const zh: Messages = {
   debugHudSummary: "调试角度（平时不用看）",
   relearnConfirm: "重新找这一侧最清楚的角度？当前记录会清掉。",
   autoshutterCancel: "自动拍摄中，点按可取消",
+  autoshutterCountdown: "{n} 秒后拍照",
   otherEarHint: "这侧拍好了，需要的话再拍另一只耳朵。",
+  limitsHint: "耳廓因人而异。清晰峰值即可拍，不必转到侧面尽头。",
 };
 
 const en: Messages = {
@@ -152,6 +157,7 @@ const en: Messages = {
   FIX_ROLL: "Straighten your head — don't tilt",
   PITCH_DOWN: "Tuck your chin a little",
   PITCH_UP: "Lift your chin a little",
+  // INTRO_* — guidance emits SWEEP_*; no naked target degrees.
   SWEEP_RIGHT_EAR:
     "Right ear: turn slowly left until the ear looks clearest",
   SWEEP_LEFT_EAR:
@@ -234,7 +240,10 @@ const en: Messages = {
   relearnConfirm:
     "Find the clearest angle for this side again? The current record will be cleared.",
   autoshutterCancel: "Auto-capture in progress — tap to cancel",
+  autoshutterCountdown: "Photo in {n}s",
   otherEarHint: "This side is done — capture the other ear if you need it.",
+  limitsHint:
+    "Ears differ. Capture at your clearest peak — no need to turn to the far side.",
 };
 
 const catalogs: Record<Locale, Messages> = { zh, en };
@@ -283,9 +292,19 @@ export function userFacingKeys(): MessageKey[] {
     "clickToStart",
     "helpStuckBody",
     "helpLimitsBody",
+    "limitsHint",
+    "autoshutterCountdown",
+    "learnedNote",
+    "learningNote",
   ];
 }
 
 export function looksLikeRigidAngleChecklist(text: string): boolean {
   return RIGID_USER_COPY.test(text);
 }
+
+/** Intro sweep copy (guidance emits SWEEP_*). Must not name a target yaw. */
+export const INTRO_PROMPT_KEYS = [
+  "SWEEP_RIGHT_EAR",
+  "SWEEP_LEFT_EAR",
+] as const;

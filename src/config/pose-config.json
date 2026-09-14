@@ -40,7 +40,9 @@
     "priorYawAbs": 60,
     "guidanceCoarseAbsError": 22,
     "slowYawDeltaDeg": 18,
-    "uxNote": "yawAbsMax is 90, not 100: the landmarker drops near 90°, so a wider window is untrackable noise. Prefer 35–90; do not widen just to match an older table."
+    "fastTurnDegPerFrame": 18,
+    "overshootTurnBackDeg": 6,
+    "uxNote": "yawAbsMax is 90, not 100: the landmarker drops near 90°, so a wider window is untrackable noise. Prefer 35–90; do not widen just to match an older table. Overshoot TURN_BACK is vs personal bestYaw (~6° past), not |yaw|>88 alone."
   },
   "score": {
     "weights": { "sharp": 0.45, "struct": 0.35, "content": 0.20 },
@@ -72,6 +74,9 @@
     "requireUserConfirm": false,
     "pitchMaxAbs": 10,
     "rollMaxAbs": 8,
+    "countdownMs": 1000,
+    "cooldownMs": 2000,
+    "confidentPeakScore": 0.5,
     "uxNote": "bandDegAroundBest 5 is the enter gate (QA ±5°). exitBandDeg 8 is READY hysteresis so a 1–2° wobble does not flicker — not a wider enter band and not a 70–90 stand-in."
   },
   "personalBest": {
@@ -99,6 +104,7 @@
     "lowStructAcrossSweep": 12,
     "flatPeakRangeDeg": 25,
     "timeoutMs": 45000,
-    "maxFaceLostFrames": 15
+    "maxFaceLostFrames": 15,
+    "wrongSideFrames": 8
   }
 }

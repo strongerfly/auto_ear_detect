@@ -526,6 +526,11 @@ describe("QA precheck: search 35–90, READY ±5°, never 70–90 alone", () => 
     expect(poseConfig.ready.bandDegAroundBest).toBe(5);
     expect(poseConfig.ready.exitBandDeg).toBe(8);
     expect(poseConfig.ready.requireUserConfirm).toBe(false);
+    expect(poseConfig.search.overshootTurnBackDeg).toBe(6);
+    expect(poseConfig.search.fastTurnDegPerFrame).toBe(18);
+    expect(poseConfig.failure.wrongSideFrames).toBe(8);
+    expect(poseConfig.ready.countdownMs).toBe(1000);
+    expect(poseConfig.ready.cooldownMs).toBe(2000);
     expect(poseConfig.search.uxNote.toLowerCase()).toContain("100");
     expect(poseConfig.ready.uxNote.toLowerCase()).toContain("hysteresis");
   });
@@ -723,6 +728,97 @@ describe("interaction coverage (coherent pass)", () => {
     const lone80 = evaluateGuidance(base({ yaw: 80 }), poseConfig, "rightEar", null, 12);
     expect(lone80.allowCapture).toBe(false);
     expect(lone80.prompt).toBe("SWEEP_RIGHT_EAR");
+  });
+
+  it("overshoot 6°+ past personal best TURN_BACK even if still sharp", () => {
+    const best = peakAt(45);
+    expect(
+      evaluateGuidance(base({ yaw: 52, quality: sharp }), poseConfig, "rightEar", best, 0)
+        .prompt,
+    ).toBe("TURN_BACK");
+    expect(
+      evaluateGuidance(
+        base({ yaw: -52, quality: sharp }),
+        poseConfig,
+        "leftEar",
+        peakAt(-45),
+        0,
+      ).prompt,
+    ).toBe("TURN_BACK");
+  });
+
+  it("approaching the peak from overshoot HOLDs, not TURN_MORE", () => {
+    const best = peakAt(45);
+    const hold = evaluateGuidance(
+      base({ yaw: 51, quality: sharp }),
+      poseConfig,
+      "rightEar",
+      best,
+      3,
+      { signedYawDelta: -2 },
+    );
+    expect(hold.prompt).toBe("HOLD_NEAR_PEAK");
+    expect(hold.prompt).not.toBe("TURN_MORE");
+    expect(hold.allowCapture).toBe(false);
+    expect(
+      evaluateGuidance(
+        base({ yaw: -51, quality: sharp }),
+        poseConfig,
+        "leftEar",
+        peakAt(-45),
+        3,
+        { signedYawDelta: 2 },
+      ).prompt,
+    ).toBe("HOLD_NEAR_PEAK");
+  });
+
+  it("weak cold-start peak without 60% sweep is not READY; a confident 45° peak is", () => {
+    const weak: PeakSample = { yaw: 36, score: 0.36 };
+    const blocked = evaluateGuidance(
+      base({ yaw: 36 }),
+      poseConfig,
+      "rightEar",
+      weak,
+      12,
+      { sweepCoverageRatio: 0.15 },
+    );
+    expect(blocked.allowCapture).toBe(false);
+    expect(blocked.prompt).not.toBe("READY");
+
+    const confident = evaluateGuidance(
+      base({ yaw: 45 }),
+      poseConfig,
+      "rightEar",
+      peakAt(45),
+      12,
+      { sweepCoverageRatio: 0.15 },
+    );
+    expect(peakAt(45).score).toBeGreaterThan(poseConfig.ready.confidentPeakScore);
+    expect(confident.prompt).toBe("READY");
+    expect(confident.allowCapture).toBe(true);
+  });
+
+  it("debounces WRONG_SIDE until wrongSideFrames; ROI out of frame near peak is TOO_CLOSE", () => {
+    expect(
+      evaluateGuidance(base({ yaw: -20 }), poseConfig, "rightEar", null, 0, {
+        wrongSideStreak: 2,
+      }).prompt,
+    ).toBe("SWEEP_RIGHT_EAR");
+    expect(
+      evaluateGuidance(base({ yaw: -20 }), poseConfig, "rightEar", null, 0, {
+        wrongSideStreak: 8,
+      }).prompt,
+    ).toBe("WRONG_SIDE");
+    expect(
+      evaluateGuidance(
+        base({ yaw: 45 }),
+        poseConfig,
+        "rightEar",
+        peakAt(45),
+        12,
+        { roiOutOfFrame: true },
+      ).prompt,
+    ).toBe("TOO_CLOSE");
   });
 });
 
