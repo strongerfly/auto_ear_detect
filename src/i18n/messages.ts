@@ -102,7 +102,7 @@ const zh: Messages = {
     "摄像头被拒绝了。请在浏览器设置里允许这个网站使用摄像头。",
   cameraOff: "摄像头未开启",
   previewHint: "前置预览像镜子 · 保存的照片不是",
-  learningNote: "慢慢转，系统会自己记住这侧最清楚的角度",
+  learningNote: "慢慢转，系统会在后台自动找这侧最清楚的角度",
   learnedNote: "已记住此侧最清楚的角度",
   captured: "拍好了",
   hudBest: "最清楚",
@@ -122,17 +122,16 @@ const zh: Messages = {
   simStillLeft: "左耳 · 模拟拍摄",
 
   helpTitle: "使用说明",
-  helpIntro:
-    "页头可切中文 / English。先点「拍左耳」或「拍右耳」（身体的左右，不是镜子里的左右）。用前置摄像头，按提示慢慢转头——转的是头，不是电脑或手机。转的时候系统会自己记住这侧最清楚的角度；第一次要慢慢转过，提示「可以拍了」才会开拍。默认开着自动快门，到点会自己拍。拍完一侧，再点另一侧重转。",
-  helpTurnHeading: "怎么转",
+  helpIntro: "语言切换在页头：中文 / English。",
+  helpTurnHeading: "能做什么",
   helpTurnBody:
-    "拍右耳：向左转。拍左耳：向右转。跟着提示走，不要对着镜子反着学。转过头很正常——「往回一点」是朝刚才更清楚的那边转回去，别继续转到后脑勺。转到头了会说「到头了，往回一点」。转太快会请你转慢一点。框在另一只耳朵上时，点另一侧按钮，系统不会自己改。",
-  helpStuckHeading: "拍不了的时候",
+    "用前置摄像头。先点「拍左耳」或「拍右耳」（身体的左右，不是镜子）。按提示慢慢转头，系统会记住这侧最清楚的角度。等到「可以拍了」再拍；默认开着自动快门，到点会自己拍。拍完一侧再换另一侧。",
+  helpStuckHeading: "做不到",
   helpStuckBody:
-    "摄像头被拒：到浏览器设置里允许这个网站使用摄像头。头发挡住、糊了或反光：拨开头发、换亮一点。角度记错、换了眼镜或发型、一直出不了「可以拍了」：点「重新学习此侧」（只清这一侧），再慢慢转一次。误点的话，拍不了，直到重新学会。",
-  helpLimitsHeading: "能做什么、不能做什么",
+    "不是医院耳镜。一次只拍一只耳朵，也不会检查你是不是点错了侧。头要大致摆正、稳住，脸在框里、距离合适。太暗或头发挡住会失败。只有侧着转头时才会学习——几乎正面或转到后脑勺都不算。预览像镜子，保存的照片不是。",
+  helpLimitsHeading: "小提示",
   helpLimitsBody:
-    "能拍一只耳朵朝向镜头的清晰照，不是医院耳镜，也不会检查你是不是点错了耳朵。头大致摆正、脸在框里、距离合适。太暗、太亮或头发挡住会失败。只有侧着转头时才会学习（几乎正面或转到后脑勺都不算）。预览像镜子，保存的照片不是，左右不会反。",
+    "拨开头发，光线好一点，慢慢转、停一停。拍右耳 → 向左转头；拍左耳 → 向右转头。角度不对就点「重新学习此侧」。",
 };
 
 const en: Messages = {
@@ -186,7 +185,8 @@ const en: Messages = {
     "Camera access was denied. Allow this site in your browser settings.",
   cameraOff: "Camera is off",
   previewHint: "Front preview is a mirror · saved photos are not",
-  learningNote: "Turn slowly — the app remembers the clearest angle for this side",
+  learningNote:
+    "Turn slowly — the app finds the clearest angle for this side in the background",
   learnedNote: "Remembered the clearest angle for this side",
   captured: "Captured",
   hudBest: "Clearest",
@@ -206,17 +206,16 @@ const en: Messages = {
   simStillLeft: "Left ear · simulated capture",
 
   helpTitle: "Instructions",
-  helpIntro:
-    "Switch 中文 / English in the header. Tap Left ear or Right ear first (your body, not the mirror). Use the front camera and turn your head as prompted — the head, not the laptop or phone. While you turn slowly, the app remembers the clearest angle for that side. The first time, capture stays off until you’ve swept slowly. Auto-shutter is on by default and will shoot when it says Ready. After one ear, tap the other side and turn again.",
-  helpTurnHeading: "How to turn",
+  helpIntro: "Language switching is in the page header: 中文 / English.",
+  helpTurnHeading: "Can",
   helpTurnBody:
-    "Right ear: turn left. Left ear: turn right. Follow the prompt; don’t copy the mirror. Overshoot is normal — “ease back” means toward the clearer pose, not past the back of your head. At the far edge you’ll see “that’s as far as it goes.” If you turn too fast, slow down. If the box is on the other ear, tap the other side — it won’t switch for you.",
-  helpStuckHeading: "If it won’t capture",
+    "Use the front camera. Tap Left ear or Right ear first (your body, not the mirror). Turn slowly as prompted — the app remembers the clearest angle for that side. Shoot when it says Ready; auto-shutter is on by default and will take the shot. Then switch sides for the other ear.",
+  helpStuckHeading: "Cannot",
   helpStuckBody:
-    "Camera denied: allow this site in your browser settings. Hair, blur, or glare: tuck hair aside and find better light. Wrong lock, new glasses or haircut, or you never reach Ready: tap Relearn this side (clears this side only) and turn slowly again. An accidental tap blocks capture until that side is relearned.",
-  helpLimitsHeading: "What it can and can’t do",
+    "Not a clinical ear scanner. One ear at a time, and it won’t check that you picked the correct side. Keep your head roughly upright and steady, face in frame, at a comfortable distance. Dark scenes or hair over the ear fail. It only learns while you turn to the side — not almost frontal, not past the back of the head. The preview is a mirror; the saved photo is not.",
+  helpLimitsHeading: "Tips",
   helpLimitsBody:
-    "It can take a clear photo of one ear facing the camera. It is not a clinical ear scanner, and it won’t check that you picked the correct ear. Keep your head roughly upright, face in frame, at a comfortable distance. Dark, bright, or hair-blocked shots fail. It only learns while you turn to the side — not almost frontal, not past the back of the head. The preview is a mirror; the saved photo is not.",
+    "Clear hair, use good light, turn slowly and pause. Right ear → turn your head left; left ear → turn your head right. If the angle is wrong, tap Relearn this side.",
 };
 
 const catalogs: Record<Locale, Messages> = { zh, en };
@@ -247,7 +246,8 @@ export function messagesFor(locale: Locale): Messages {
   return catalogs[locale] ?? catalogs.en;
 }
 
-const RIGID_USER_COPY = /70\s*[–-]\s*90|60\s*[–-]\s*95|\|yaw\||±\s*15|FISWG/i;
+const RIGID_USER_COPY =
+  /70\s*[–-]\s*90|60\s*[–-]\s*95|\|yaw\||±\s*15|FISWG|\+yaw|校准此侧偏移|calibrate this side/i;
 
 export function userFacingKeys(): MessageKey[] {
   return [
@@ -260,6 +260,8 @@ export function userFacingKeys(): MessageKey[] {
     "learningNote",
     "relearn",
     "clickToStart",
+    "helpStuckBody",
+    "helpLimitsBody",
   ];
 }
 

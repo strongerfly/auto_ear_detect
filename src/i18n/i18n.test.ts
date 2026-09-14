@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { PROMPT_KEYS } from "../config";
 import {
   LOCALE_STORAGE_KEY,
@@ -77,6 +79,50 @@ describe("string lookup", () => {
       expect(looksLikeRigidAngleChecklist(translate("zh", key))).toBe(false);
       expect(looksLikeRigidAngleChecklist(translate("en", key))).toBe(false);
     }
+  });
+
+  it("help describes auto-learn, header language switch, and turn pairing", () => {
+    const zh = [
+      translate("zh", "helpIntro"),
+      translate("zh", "helpTurnBody"),
+      translate("zh", "helpStuckBody"),
+      translate("zh", "helpLimitsBody"),
+      translate("zh", "relearn"),
+    ].join("\n");
+    expect(zh).toContain("页头");
+    expect(zh).toContain("记住这侧最清楚");
+    expect(zh).toContain("拍右耳 → 向左转头");
+    expect(zh).toContain("拍左耳 → 向右转头");
+    expect(zh).toContain("重新学习此侧");
+    expect(zh).toContain("医院耳镜");
+    expect(zh).not.toContain("校准此侧偏移");
+    expect(zh).not.toMatch(/60\s*[–-]\s*95/);
+
+    const en = [
+      translate("en", "helpIntro"),
+      translate("en", "helpTurnBody"),
+      translate("en", "helpStuckBody"),
+      translate("en", "helpLimitsBody"),
+      translate("en", "relearn"),
+    ].join("\n");
+    expect(en.toLowerCase()).toContain("header");
+    expect(en.toLowerCase()).toContain("remembers the clearest angle");
+    expect(en.toLowerCase()).toContain("right ear → turn your head left");
+    expect(en.toLowerCase()).toContain("left ear → turn your head right");
+    expect(en).toContain("Relearn this side");
+    expect(en.toLowerCase()).toContain("clinical ear scanner");
+    expect(en.toLowerCase()).not.toContain("calibrate this side");
+  });
+
+  it("README.zh-CN teaches auto-learn, not 60–95 offset calibration", () => {
+    const md = readFileSync(
+      resolve(import.meta.dirname, "../../README.zh-CN.md"),
+      "utf8",
+    );
+    expect(md).not.toMatch(/60\s*[–-]\s*95/);
+    expect(md).not.toContain("校准此侧偏移");
+    expect(md).toContain("重新学习此侧");
+    expect(md).toContain("自动学");
   });
 
   it("interpolates placeholders", () => {
