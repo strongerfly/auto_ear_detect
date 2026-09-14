@@ -35,8 +35,13 @@ export function useWebcam() {
       await video.play();
       setReady(true);
     } catch (err) {
+      const name = err instanceof DOMException ? err.name : "";
       const message =
-        err instanceof Error ? err.message : "无法打开摄像头";
+        name === "NotAllowedError" || name === "NotFoundError"
+          ? name
+          : err instanceof Error
+            ? err.message
+            : "unavailable";
       setError(message);
       setReady(false);
     }

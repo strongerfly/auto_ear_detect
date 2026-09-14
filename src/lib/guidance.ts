@@ -24,6 +24,7 @@ export type GuidanceInput = {
   pitch: number;
   roll: number;
   quality: EarQuality | null;
+  faceCount?: number;
 };
 
 export type GuidanceExtras = {
@@ -48,6 +49,10 @@ function pickYawPrompt(
 ): PromptKey | null {
   if (t.side === "rightEar" && yaw < -8) return "WRONG_SIDE";
   if (t.side === "leftEar" && yaw > 8) return "WRONG_SIDE";
+
+  if (Math.abs(yaw) >= config.failure.stuckNearOuterEdgeDeg) {
+    return "TURN_BACK_OVERSHOOT";
+  }
 
   const err = yaw - t.yawCenter;
   const abs = Math.abs(err);
@@ -117,6 +122,9 @@ export function pickPrompt(
   ) {
     return { ...fail, prompt: "NO_FACE", poseNear: false, poseReady: false };
   }
+  if ((input.faceCount ?? 1) > 1) {
+    return { ...fail, prompt: "MULTI_FACE", poseNear: false, poseReady: false };
+  }
   if (input.faceHeightRatio < config.faceGates.minFaceHeightRatio) {
     return { ...fail, prompt: "TOO_FAR", poseNear: false, poseReady: false };
   }
@@ -156,6 +164,18 @@ export function pickPrompt(
     return { ...fail, prompt: "CLEAR_HAIR" };
   }
   if (qualityKind === "light") {
+    if (
+      input.quality &&
+      input.quality.brightness > config.ready.brightnessMax
+    ) {
+      return { ...fail, prompt: "TOO_BRIGHT" };
+    }
+    if (
+      input.quality &&
+      input.quality.brightness < config.ready.brightnessMin
+    ) {
+      return { ...fail, prompt: "TOO_DARK" };
+    }
     return { ...fail, prompt: "BAD_LIGHT" };
   }
 

@@ -46,6 +46,13 @@ describe("pickPrompt priority", () => {
     expect(r.allowCapture).toBe(false);
   });
 
+  it("MULTI_FACE when more than one face is tracked", () => {
+    expect(
+      evaluateGuidance(base({ faceCount: 2, yaw: 60 }), poseConfig, "rightEar", null, 0)
+        .prompt,
+    ).toBe("MULTI_FACE");
+  });
+
   it("TOO_FAR / TOO_CLOSE", () => {
     expect(
       evaluateGuidance(base({ faceHeightRatio: 0.1 }), poseConfig, "rightEar", null, 0)
@@ -95,7 +102,7 @@ describe("pickPrompt priority", () => {
     ).toBe("TURN_MORE");
     expect(
       evaluateGuidance(base({ yaw: 90 }), poseConfig, "rightEar", null, 0).prompt,
-    ).toBe("TURN_BACK");
+    ).toBe("TURN_BACK_OVERSHOOT");
   });
 
   it("left-ear sweep (mirrored) vs the soft prior", () => {
@@ -107,7 +114,7 @@ describe("pickPrompt priority", () => {
     ).toBe("TURN_MORE");
     expect(
       evaluateGuidance(base({ yaw: -90 }), poseConfig, "leftEar", null, 0).prompt,
-    ).toBe("TURN_BACK");
+    ).toBe("TURN_BACK_OVERSHOOT");
   });
 
   it("WRONG_SIDE if turning the opposite way", () => {
@@ -129,7 +136,7 @@ describe("pickPrompt priority", () => {
     ).toBe("SLOW_DOWN");
   });
 
-  it("CLEAR_HAIR then BAD_LIGHT only once near the personal peak", () => {
+  it("CLEAR_HAIR then TOO_DARK only once near the personal peak", () => {
     const best = peakAt(60);
     expect(
       evaluateGuidance(
@@ -148,7 +155,7 @@ describe("pickPrompt priority", () => {
         best,
         0,
       ).prompt,
-    ).toBe("BAD_LIGHT");
+    ).toBe("TOO_DARK");
   });
 
   it("does not nag hair while still far from the peak", () => {

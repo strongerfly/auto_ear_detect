@@ -1,4 +1,5 @@
 import type { PeakSample } from "../lib/personal-best";
+import { useLocale } from "../i18n";
 
 export function AngleHud({
   yaw,
@@ -11,6 +12,7 @@ export function AngleHud({
   roll: number | null;
   bestYaw: PeakSample | null;
 }) {
+  const { t } = useLocale();
   const fmt = (v: number | null) =>
     v === null || Number.isNaN(v) ? "—" : v.toFixed(1);
   return (
@@ -25,7 +27,10 @@ export function AngleHud({
         roll <strong>{fmt(roll)}°</strong>
       </span>
       <span>
-        最佳 <strong>{bestYaw ? `${bestYaw.yaw.toFixed(0)}°` : "学习中"}</strong>
+        {t("hudBest")}{" "}
+        <strong>
+          {bestYaw ? `${bestYaw.yaw.toFixed(0)}°` : t("hudLearning")}
+        </strong>
       </span>
     </div>
   );

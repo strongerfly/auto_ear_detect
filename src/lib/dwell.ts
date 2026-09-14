@@ -23,6 +23,7 @@ type Family = "face" | "dist" | "pose" | "yaw" | "quality" | "hold" | "ready";
 function familyOf(prompt: PromptKey): Family {
   switch (prompt) {
     case "NO_FACE":
+    case "MULTI_FACE":
       return "face";
     case "TOO_FAR":
     case "TOO_CLOSE":
@@ -35,11 +36,14 @@ function familyOf(prompt: PromptKey): Family {
     case "SWEEP_LEFT_EAR":
     case "TURN_MORE":
     case "TURN_BACK":
+    case "TURN_BACK_OVERSHOOT":
     case "SLOW_DOWN":
     case "WRONG_SIDE":
       return "yaw";
     case "CLEAR_HAIR":
     case "BAD_LIGHT":
+    case "TOO_DARK":
+    case "TOO_BRIGHT":
       return "quality";
     case "HOLD_STILL":
       return "hold";
