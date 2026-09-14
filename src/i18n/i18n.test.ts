@@ -79,6 +79,37 @@ describe("string lookup", () => {
     }
   });
 
+  it("help describes auto-learn, header language switch, and turn pairing", () => {
+    const zh = [
+      translate("zh", "helpIntro"),
+      translate("zh", "helpTurnBody"),
+      translate("zh", "helpStuckBody"),
+      translate("zh", "learningNote"),
+      translate("zh", "relearn"),
+    ].join("\n");
+    expect(zh).toContain("页头");
+    expect(zh).toContain("自动找");
+    expect(zh).toContain("拍右耳 → 向左转头");
+    expect(zh).toContain("拍左耳 → 向右转头");
+    expect(zh).toContain("重新学习此侧");
+    expect(zh).not.toContain("校准此侧偏移");
+    expect(zh).not.toMatch(/60\s*[–-]\s*95/);
+
+    const en = [
+      translate("en", "helpIntro"),
+      translate("en", "helpTurnBody"),
+      translate("en", "helpStuckBody"),
+      translate("en", "learningNote"),
+      translate("en", "relearn"),
+    ].join("\n");
+    expect(en.toLowerCase()).toContain("header");
+    expect(en.toLowerCase()).toContain("background");
+    expect(en.toLowerCase()).toContain("right ear → turn your head left");
+    expect(en.toLowerCase()).toContain("left ear → turn your head right");
+    expect(en).toContain("Relearn this side");
+    expect(en.toLowerCase()).not.toContain("calibrate this side");
+  });
+
   it("interpolates placeholders", () => {
     expect(interpolate("err {error}", { error: "boom" })).toBe("err boom");
     expect(translate("en", "modelLoadFailed", { error: "404" })).toContain(
