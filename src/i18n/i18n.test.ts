@@ -296,9 +296,19 @@ describe("string lookup", () => {
     expect(translate("en", "captureNearPeak")).not.toMatch(/\d+\s*°/);
   });
 
-  it("SOFT_READY is distinct from READY", () => {
+  it("SOFT_READY is a perceptible success, distinct from READY", () => {
     expect(translate("zh", "SOFT_READY")).not.toBe(translate("zh", "READY"));
     expect(translate("en", "SOFT_READY")).not.toBe(translate("en", "READY"));
+    expect(translate("zh", "SOFT_READY")).toMatch(/够清楚/);
+    expect(translate("zh", "SOFT_READY")).toMatch(/正面耳廓/);
+    expect(translate("en", "SOFT_READY")).toMatch(/clear enough/i);
+    expect(translate("en", "SOFT_READY")).toMatch(/frontal ear photo/i);
+    expect(translate("zh", "softSuccess")).toBe("够清楚了");
+    expect(translate("en", "softSuccess")).toMatch(/clear enough/i);
+    expect(translate("zh", "helpTurnBody")).toContain("够清楚了");
+    expect(translate("en", "helpTurnBody")).toMatch(/clear enough/i);
+    expect(translate("zh", "SOFT_READY")).not.toMatch(/\d+\s*°/);
+    expect(translate("en", "SOFT_READY")).not.toMatch(/\d+\s*°/);
     expect(translate("zh", "EAR_OUT_OF_FRAME")).toMatch(/出画|画面/);
     expect(translate("en", "EAR_OUT_OF_FRAME")).toMatch(/out of frame/i);
   });

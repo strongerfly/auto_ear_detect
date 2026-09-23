@@ -8,7 +8,9 @@ import {
   keepPeaksOnSideSwitch,
   noteSweepSample,
   pickPromptDuringIntro,
+  showSoftSuccess,
   sideIntroUntil,
+  stepSoftSuccessLatch,
 } from "./side-session";
 
 describe("side switch intro", () => {
@@ -60,6 +62,17 @@ describe("soft peak vs READY", () => {
     stats = noteSweepSample(stats, 45, 0.85);
     stats = noteSweepSample(stats, 70, 0.5);
     expect(isSoftPeak(stats, 0.85)).toBe(false);
+  });
+
+  it("keeps soft-success visible through capture and clears if you leave first", () => {
+    expect(stepSoftSuccessLatch(false, true, false)).toBe(true);
+    expect(showSoftSuccess(true, true, false)).toBe(true);
+    const held = stepSoftSuccessLatch(true, false, true);
+    expect(held).toBe(true);
+    expect(showSoftSuccess(held, false, true)).toBe(true);
+    expect(stepSoftSuccessLatch(true, false, false)).toBe(false);
+    expect(showSoftSuccess(false, false, true)).toBe(false);
+    expect(showSoftSuccess(false, false, false)).toBe(false);
   });
 });
 
