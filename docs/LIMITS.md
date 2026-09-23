@@ -32,7 +32,7 @@ Head pose from MediaPipe is for **direction**. Ear-ROI sharpness/structure is ho
 - **45s no-progress timeout:** now a recovery narrative (`STUCK_NO_PROGRESS`) with **Try again** / **Relearn** / hair-light copy. Still not a hard fail, and it cannot diagnose *why* (hair vs light vs tracker vs false peak).
 - **Meatus-like dark-blob penalty:** weak center-brightness heuristic only. Without seg we cannot tell meatus from hair shadow.
 - **Ear-out-of-frame:** ROI clip ratio, not a real ear detector. Hair covering a fully in-frame pinna still looks like `CLEAR_HAIR`.
-- **Soft-success vs READY:** heuristic (weak absolute peak or a wide flat sweep). Not a calibrated “this is definitely not an ear” check. When it allows capture, the UI shows a success pulse and a “Clear enough” badge (held through the shutter) — not a warning color, and not a fixed yaw band.
+- **Soft-success vs READY:** heuristic (weak absolute peak or a wide flat sweep). Not a calibrated “this is definitely not an ear” check. Same quality gate as READY; soft uses yellow chrome, a distinct shutter hint, and its own post-capture line. Strong peaks stay green READY. Not a fixed yaw band. Auto-shutter still counts down.
 - **Burst pick-by-score of stored frames:** countdown still waits for 3 ready frames, then captures the current frame. It does not keep a 3-frame buffer and pick the sharpest.
 
 ## Won't do
@@ -95,7 +95,7 @@ To break through: An attributable quality head or segmentation.
 ## Next cuts within the ceiling (shippable; not items 1–8 above)
 - #7 string-key alignment landed
 - First-run side pick landed
-- More-perceptible soft-success landed (pulse, check badge, success copy; held through the shutter)
+- IX-B soft vs READY distinction landed (yellow soft hint/copy, green READY; no fixed yaw gate)
 - Copy polish after simulator defaults to collapsed (simulator default collapsed already done)
 
-Note: Items 1–8 are documentation-only (no implementation tickets). In “next cuts,” #7 string-key alignment, first-run side pick, and more-perceptible soft-success have landed. The remaining eng ticket (simulator copy polish) is owned by the lead.
+Note: Items 1–8 are documentation-only (no implementation tickets). In “next cuts,” #7 string-key alignment, first-run side pick, and IX-B soft vs READY copy have landed. The remaining eng ticket (simulator copy polish) is owned by the lead.

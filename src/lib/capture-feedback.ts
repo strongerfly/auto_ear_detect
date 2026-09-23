@@ -7,7 +7,23 @@ export type CaptureFeedback = {
   side: EarSide;
   grade: CaptureGrade;
   scoreRatio: number;
+  /** True when the shutter fired on SOFT_READY (weak/flat peak), not strong READY. */
+  soft: boolean;
 };
+
+export type CaptureResultKey =
+  | "captureSoftSuccess"
+  | "captureNearPeak"
+  | "captureOffPeak";
+
+/** Post-capture line. A soft shutter uses its own sentence; relearn stays optional. */
+export function captureResultKey(feedback: {
+  grade: CaptureGrade;
+  soft: boolean;
+}): CaptureResultKey {
+  if (feedback.soft) return "captureSoftSuccess";
+  return feedback.grade === "offPeak" ? "captureOffPeak" : "captureNearPeak";
+}
 
 /**
  * Grade a still against this side's remembered peak. Never returns degrees —
@@ -28,6 +44,7 @@ export function captureFeedbackFor(
   capturedScore: number,
   peakScore: number | null,
   ratioOfBest: number = poseConfig.ready.scoreRatioOfBest,
+  soft = false,
 ): CaptureFeedback {
   const safePeak = peakScore != null && peakScore > 0 ? peakScore : capturedScore;
   const scoreRatio =
@@ -38,6 +55,7 @@ export function captureFeedbackFor(
     side,
     grade: gradeCapture(capturedScore, peakScore, ratioOfBest),
     scoreRatio,
+    soft,
   };
 }
 

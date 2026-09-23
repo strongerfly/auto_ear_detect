@@ -40,21 +40,27 @@ export type GuidanceExtras = {
   softPeak?: boolean;
 };
 
-export type CaptureUiState = "learning" | "hold" | "ready";
+export type CaptureUiState = "learning" | "hold" | "ready" | "soft";
 
 export function captureUiFor(
   locked: boolean,
   allowCapture: boolean,
+  softReady = false,
 ): CaptureUiState {
+  if (allowCapture && softReady) return "soft";
   if (allowCapture) return "ready";
   if (locked) return "hold";
   return "learning";
 }
 
-/** Grey shutter copy: learning vs near-peak vs ready. Never HOLD_STILL. */
+/**
+ * Shutter hint: learning vs near-peak vs strong READY vs weak/flat soft.
+ * Soft must not reuse the READY line. Never HOLD_STILL.
+ */
 export function captureHintKey(
   ui: CaptureUiState,
-): "READY" | "NEAR_PEAK" | "learningNote" {
+): "READY" | "NEAR_PEAK" | "learningNote" | "softCaptureHint" {
+  if (ui === "soft") return "softCaptureHint";
   if (ui === "ready") return "READY";
   if (ui === "hold") return "NEAR_PEAK";
   return "learningNote";
