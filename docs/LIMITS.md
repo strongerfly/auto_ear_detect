@@ -92,17 +92,19 @@ To break through: Long-term same-person same-device signals.
 Cannot-do: Only “not found this time” + change light / clear hair / relearn.
 To break through: An attributable quality head or segmentation.
 
-## HarmonyOS shell (packaging ceiling)
+## HarmonyOS shell (packaging ceiling · path B)
 
-Not one of items 1–8. Shipping ceiling only. Do not read it as capture-quality work.
+Not one of items 1–8. Shipping and packaging ceiling only. Do not read it as capture-quality work.
 
-Cannot claim a store-ready or officially supported HarmonyOS build.
+**Shipping ceiling today: Web + Android.** Browser capture, plus the Android debug APK already on `main`, is the deliverable path. Harmony is not a supported platform today.
 
-- **Blockers:** A HAP needs DevEco Studio and signing. There is no official Capacitor Harmony path. This repo has no CI job that produces a HAP.
-- **Ceiling today:** Phone/web capture, plus the Android debug APK already on `main`. No Harmony package is in the tree.
-- **Shortfalls:** Camera permission, WebView, and MediaPipe WASM on Harmony are unverified here. A local shell kept outside the repo is not evidence of support.
-- **Next:** Leave the ceiling written here until a real HAP milestone exists. Do not commit a `harmony/` tree or binaries in place of that milestone.
-- **Breakthrough conditions:** DevEco set up, signing certificates, an installable HAP, and an on-device check that the camera permission and the capture flow actually run. Store listing is a further vendor release step, and it stays out of scope until those conditions exist.
+Path B: this cloud iteration delivers a reviewable ArkWeb/Web thin-shell scaffold, sync scripts, build recipes, and these LIMITS. An installable HAP is produced on a local DevEco machine, or on a dedicated CI that already has signing secrets. Do not claim the default Cursor cloud VM can build an installable HAP. Ionic has no HarmonyOS NEXT Capacitor plan. Community OpenHarmony/Oniro adapters are not the Huawei store path. Do not write this as official Capacitor Harmony, or as store-ready.
+
+- **Blockers:** No official Capacitor → HarmonyOS NEXT path. Needs Huawei Command Line Tools / SDK (or local DevEco) plus signing. Default CI in this repo does not produce a HAP. On-device Harmony camera permission and the ear-capture path are not accepted here.
+- **Ceiling today:** Web and the Android debug APK on `main`. Harmony is at most an in-progress shell. A scaffold in the tree ≠ supported Harmony, ≠ an installable HAP, ≠ store-ready.
+- **Shortfalls:** Signing materials, device UDID/Profile, in-ArkWeb camera permission, and MediaPipe WASM behavior are not verified on a real device in this repo.
+- **Next:** Cross-reference the engineering path docs here once they land (placeholder). Do not change the claim to supported, installable, or store-ready until the breakthrough conditions are met.
+- **Breakthrough conditions** (all of them, before saying there is an installable debug HAP): Huawei CLI/SDK (or local DevEco) available; the signing trio (debug/release certificate materials such as `.p12` / `.cer` / `.p7b`, or an equivalent Profile) can sign non-interactively; an installable HAP is produced; on-device camera permission takes effect, and the ear-capture main path (getUserMedia inside the web shell plus the existing quality-peak flow) runs through once. Store listing is a later step and stays out of scope until those conditions exist.
 
 ## Next cuts within the ceiling (shippable; not items 1–8 above)
 - #7 string-key alignment landed
