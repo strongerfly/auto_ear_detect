@@ -38,6 +38,37 @@ npm run preview
 
 GitHub Actions (`.github/workflows/ci.yml`) runs `npm ci`, `npm test`, and `npm run build` on push and pull requests to `main`.
 
+## Android debug APK
+
+Capacitor 8 wraps the existing Vite build in an Android WebView. The ear-capture UI is unchanged.
+
+Needs Node.js LTS, JDK 21, and an Android SDK with `platforms;android-36` and `build-tools;35.0.0` (Android Gradle Plugin 8.13 installs 35.0.0 on the first build once SDK licenses are accepted). `ANDROID_HOME` must point at that SDK.
+
+```bash
+npm ci
+npm run android:debug
+```
+
+That builds the web app, copies it into `android/` (`cap sync`), and runs `./gradlew assembleDebug`.
+
+APK path:
+
+`android/app/build/outputs/apk/debug/app-debug.apk`
+
+A copy of that debug build is checked in at `artifacts/app-debug.apk` for a direct download. After the web app changes, regenerate with `npm run android:debug`; the Gradle output is the source of truth.
+
+Install on a device with USB debugging:
+
+```bash
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Or copy the APK onto the phone and open it (allow install from that source). Minimum Android 7 (API 24). Accept the camera prompt. The Face Landmarker `.task` model is bundled from `public/models/` at sync time. The WASM runtime still loads from jsDelivr, so the first launch needs a network.
+
+`.github/workflows/android-debug-apk.yml` builds the same debug APK and uploads it as the `app-debug` artifact.
+
+This is a debug-signed APK (Gradle’s debug keystore), not a Play Store release. CI does not boot an emulator or open the camera. If the WebView GPU delegate fails, the app already falls back to CPU.
+
 No API keys. Face Landmarker WASM loads from jsDelivr; the `.task` model is served from `public/models/` when present, otherwise Google’s MediaPipe model host.
 
 ## Left / right convention (FISWG)

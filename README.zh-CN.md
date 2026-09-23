@@ -38,6 +38,37 @@ npm run preview
 
 GitHub Actions（`.github/workflows/ci.yml`）会在推送到 `main` 以及针对 `main` 的 Pull Request 上运行 `npm ci`、`npm test` 和 `npm run build`。
 
+## Android 调试 APK
+
+用 Capacitor 8 把现有的 Vite 构建包进 Android WebView。耳廓拍摄界面本身不改。
+
+需要 Node.js LTS、JDK 21，以及带 `platforms;android-36` 和 `build-tools;35.0.0` 的 Android SDK（Android Gradle Plugin 8.13 在接受 SDK 许可后，第一次构建会安装 35.0.0）。`ANDROID_HOME` 要指向该 SDK。
+
+```bash
+npm ci
+npm run android:debug
+```
+
+这条命令会先构建网页，再同步进 `android/`（`cap sync`），然后执行 `./gradlew assembleDebug`。
+
+APK 路径：
+
+`android/app/build/outputs/apk/debug/app-debug.apk`
+
+同一次调试构建的副本在 `artifacts/app-debug.apk`，可以直接下载。网页改过之后用 `npm run android:debug` 重新生成；以 Gradle 输出为准。
+
+手机开 USB 调试后安装：
+
+```bash
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+也可以把 APK 拷到手机上直接打开（允许该来源安装）。最低 Android 7（API 24）。弹出摄像头权限时点允许。Face Landmarker 的 `.task` 模型在同步时从 `public/models/` 打进包里。WASM 仍从 jsDelivr 加载，所以第一次打开需要联网。
+
+`.github/workflows/android-debug-apk.yml` 会打出同一个调试 APK，并作为名为 `app-debug` 的构建产物上传。
+
+这是调试签名（Gradle 的 debug keystore），不是上架用的正式包。CI 不会启动模拟器，也不会打开摄像头。WebView 的 GPU 委托失败时，应用会按原逻辑退回 CPU。
+
 无需 API 密钥。Face Landmarker 的 WASM 从 jsDelivr 加载；`.task` 模型优先使用 `public/models/`，否则回退到 Google MediaPipe 模型主机。
 
 ## 左右约定（FISWG）

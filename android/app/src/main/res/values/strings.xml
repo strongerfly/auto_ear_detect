@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Ear Capture</string>
+    <string name="title_activity_main">Ear Capture</string>
+    <string name="package_name">app.autoeardetect.earcapture</string>
+    <string name="custom_url_scheme">app.autoeardetect.earcapture</string>
+</resources>
