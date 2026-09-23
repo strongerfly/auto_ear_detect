@@ -92,6 +92,18 @@ To break through: Long-term same-person same-device signals.
 Cannot-do: Only “not found this time” + change light / clear hair / relearn.
 To break through: An attributable quality head or segmentation.
 
+## HarmonyOS shell (packaging ceiling)
+
+Not one of items 1–8. Shipping ceiling only. Do not read it as capture-quality work.
+
+Cannot claim a store-ready or officially supported HarmonyOS build.
+
+- **Blockers:** A HAP needs DevEco Studio and signing. There is no official Capacitor Harmony path. This repo has no CI job that produces a HAP.
+- **Ceiling today:** Phone/web capture, plus the Android debug APK already on `main`. No Harmony package is in the tree.
+- **Shortfalls:** Camera permission, WebView, and MediaPipe WASM on Harmony are unverified here. A local shell kept outside the repo is not evidence of support.
+- **Next:** Leave the ceiling written here until a real HAP milestone exists. Do not commit a `harmony/` tree or binaries in place of that milestone.
+- **Breakthrough conditions:** DevEco set up, signing certificates, an installable HAP, and an on-device check that the camera permission and the capture flow actually run. Store listing is a further vendor release step, and it stays out of scope until those conditions exist.
+
 ## Next cuts within the ceiling (shippable; not items 1–8 above)
 - #7 string-key alignment landed
 - First-run side pick landed
