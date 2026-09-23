@@ -55,6 +55,8 @@ APK 路径：
 
 `android/app/build/outputs/apk/debug/app-debug.apk`
 
+同一次调试构建的副本在 `artifacts/app-debug.apk`，可以直接下载。网页改过之后用 `npm run android:debug` 重新生成；以 Gradle 输出为准。
+
 手机开 USB 调试后安装：
 
 ```bash

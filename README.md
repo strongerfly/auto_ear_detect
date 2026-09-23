@@ -55,6 +55,8 @@ APK path:
 
 `android/app/build/outputs/apk/debug/app-debug.apk`
 
+A copy of that debug build is checked in at `artifacts/app-debug.apk` for a direct download. After the web app changes, regenerate with `npm run android:debug`; the Gradle output is the source of truth.
+
 Install on a device with USB debugging:
 
 ```bash
