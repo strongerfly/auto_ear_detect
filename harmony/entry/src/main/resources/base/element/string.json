@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Web shell for a clear frontal pinna photo. Not medical. Not a store build."
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Ear Capture"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "Ear Capture"
+    },
+    {
+      "name": "camera_reason",
+      "value": "用于拍摄清晰的正面耳廓照片，不是医疗或耳镜。Used to take a clear frontal pinna photo, not for medical use."
+    }
+  ]
+}

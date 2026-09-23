@@ -1,0 +1,8 @@
+{
+  "modelVersion": "5.0.0",
+  "name": "earcapture",
+  "version": "1.0.0",
+  "description": "HarmonyOS NEXT Web shell scaffold for Ear Capture. Not an installable HAP.",
+  "dependencies": {},
+  "devDependencies": {}
+}

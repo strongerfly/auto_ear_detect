@@ -1,0 +1,9 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "Ear Capture entry module. ArkWeb shell only. Not an installable HAP.",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {}
+}

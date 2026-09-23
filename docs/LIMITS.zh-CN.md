@@ -96,13 +96,15 @@ English twin: [LIMITS.md](./LIMITS.md).
 
 不属于上面 1–8。只写发行上限，不是拍耳质量上限。
 
-不能声称可上架，也不能写成官方支持的鸿蒙交付。
+不能声称可上架，不能写成可安装的 HAP，也不能写成官方支持的鸿蒙交付。**HM-IX-0 真机冒烟没有跑过。** 在 [harmony-next-path.md](./harmony-next-path.md) §1.3 全部勾上之前，这一项保持阻断。签名证书和真机 UDID 目前都没有；本轮不空等，也不编造。
 
-- **卡点：** HAP 需要 DevEco Studio 和签名。没有官方 Capacitor 鸿蒙路径。本仓库没有打出 HAP 的 CI。
-- **当前上限：** 手机/Web 拍耳，加上已在 `main` 的 Android debug APK。树里没有鸿蒙包。
-- **短板：** 鸿蒙上的相机权限、WebView、MediaPipe WASM 都未在本仓库验证。仓库外自留的本地壳不能当作已支持。
-- **后续：** 在真正有 HAP 里程碑之前，上限只写在这里。不要用入库 `harmony/` 树或二进制代替该里程碑。
-- **突破条件：** DevEco 环境就绪、签名证书、可安装的 HAP，以及真机上相机权限和拍摄流程确实能跑。应用市场上架是更后面的厂商发布步骤，这些条件不具备之前不做。
+`harmony/` 是 ArkTS **Web 壳脚手架**，加上 dist→rawfile 同步。它不是 HAP，也不是把仓库外旧壳当「已支持」拣回来。
+
+- **卡点：** 可安装的 HAP 需要华为 Command Line Tools 或 DevEco Studio、HarmonyOS NEXT SDK，以及签名三件套（`.p12` / `.cer` / `.p7b`）和密码。没有官方 Capacitor HarmonyOS NEXT 路径。CI 只把网页构建同步进 `rawfile`，不跑 `hvigorw`，也不上传 HAP。这台云端 VM 不是构建机，也不是模拟器主机。
+- **当前上限：** 手机/Web 拍耳，加上已在 `main` 的 Android debug APK。这个 APK 不能装到纯血鸿蒙 NEXT。这里不产出已签名的鸿蒙包。
+- **短板：** 壳里的相机权限、ArkWeb `getUserMedia`、MediaPipe WASM 都还没有真机验证。仓库外的目录不能当作已支持。脚手架不能写成已支持。
+- **后续：** 出包步骤和 §1.3 清单在 [harmony-next-path.md](./harmony-next-path.md)。材料只列名字，见 [harmony-signing-secrets.md](./harmony-signing-secrets.md)。可装 HAP（A1）、真机冒烟、DevEco 模拟器验收都先搁置，直到这些条件齐。
+- **突破条件（§1.3，全部满足后才允许写「已支持」或「可装 HAP」）：** 华为账号能下载 Linux Command Line Tools 和对应 NEXT SDK；工具链放在持久构建机上（不要每次换一台新的 Cursor VM）；调试或发布签名三件套以 Secrets 注入；一台验收机（真机 UDID 写进调试 Profile，或本机 DevEco 模拟器——不是这台 VM）；`harmony/` 能配合网页同步真正打出包；有一套证据：`assembleHap` 日志 + 签名后的 HAP + `hdc install`，然后真机上相机权限和拍耳流程跑通。应用市场上架仍在这些都成立之后。
 
 ## 天花板内下一刀（可落地，非上面 1–8）
 - #7 文案键对齐合入

@@ -31,3 +31,6 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Sync Vite dist into Harmony rawfile (no HAP)
+        run: node scripts/sync-harmony-rawfile.mjs
