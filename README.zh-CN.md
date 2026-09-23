@@ -117,3 +117,7 @@ src/components/EarCaptureApp.tsx
 单元测试（`npm test`）覆盖 Euler、提示流程、bestYaw（含 45° 峰值）、语言查找、停留和 ROI 质量——不需要摄像头。
 
 应用内的**姿态模拟器**可以让质量随角度变化，用来看就绪是不是跟个人最清楚的角度走。
+
+## 工位式机器人 PoC
+
+独立的短期**坐姿工位**仿真（协作臂 + 腕部 RGB-D，仅离线 Python）在 [`robot-ear-workstation-poc/`](robot-ear-workstation-poc/README.md)。它复用耳区打分思路，不改这个手机/网页拍摄应用。范围和限制见该目录 README。
