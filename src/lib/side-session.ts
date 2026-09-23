@@ -99,26 +99,3 @@ export function isSoftPeak(
     scoreSpan <= config.failure.flatScoreSpan
   );
 }
-
-/**
- * Soft-success is earned from the quality bar (weak or flat peak), then kept
- * through the shutter. Drifting off that bar before a shot clears it.
- * No yaw-band check — the caller already decided soft-ready from quality.
- */
-export function stepSoftSuccessLatch(
-  latched: boolean,
-  softReady: boolean,
-  captured: boolean,
-): boolean {
-  if (captured) return latched || softReady;
-  return softReady;
-}
-
-/** Explicit success chrome: on the quality bar, or still showing after that shot. */
-export function showSoftSuccess(
-  latched: boolean,
-  softReady: boolean,
-  captured: boolean,
-): boolean {
-  return softReady || (captured && latched);
-}

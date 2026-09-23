@@ -537,6 +537,9 @@ describe("quality-driven personal best yaw", () => {
     expect(captureHintKey("hold")).toBe("NEAR_PEAK");
     expect(captureHintKey("hold")).not.toBe("HOLD_STILL");
     expect(captureHintKey("ready")).toBe("READY");
+    expect(captureUiFor(true, true, true)).toBe("soft");
+    expect(captureHintKey("soft")).toBe("softCaptureHint");
+    expect(captureHintKey("soft")).not.toBe("READY");
     const learning = evaluateGuidance(
       base({ yaw: 45 }),
       poseConfig,

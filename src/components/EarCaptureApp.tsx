@@ -39,7 +39,12 @@ import {
   yawInSearchWindow,
   type PersonalBestMap,
 } from "../lib/personal-best";
-import { captureFeedbackFor, otherEar, type CaptureFeedback } from "../lib/capture-feedback";
+import {
+  captureFeedbackFor,
+  captureResultKey,
+  otherEar,
+  type CaptureFeedback,
+} from "../lib/capture-feedback";
 import {
   gateCapture,
   isSideChosen,
@@ -56,9 +61,7 @@ import {
   keepPeaksOnSideSwitch,
   noteSweepSample,
   pickPromptDuringIntro,
-  showSoftSuccess,
   sideIntroUntil,
-  stepSoftSuccessLatch,
 } from "../lib/side-session";
 import type { EarQuality, EulerDeg, RoiBox } from "../lib/types";
 
@@ -73,8 +76,8 @@ type LiveState = {
   faceHeightRatio: number;
   shutterCountdownMs: number | null;
   stuck: boolean;
-  /** Quality bar met (weak/flat peak): success chip stays through the shutter. */
-  softSuccess: boolean;
+  /** Weak/flat peak that already passed the quality READY gate. */
+  softReady: boolean;
   captured: boolean;
 };
 
@@ -89,7 +92,7 @@ const INITIAL_LIVE: LiveState = {
   faceHeightRatio: 0,
   shutterCountdownMs: null,
   stuck: false,
-  softSuccess: false,
+  softReady: false,
   captured: false,
 };
 
@@ -143,8 +146,6 @@ export function EarCaptureApp() {
   const sweepRef = useRef(EMPTY_SWEEP);
   const capturedThisSideRef = useRef(false);
   const wasReadyRef = useRef(false);
-  const softSuccessLatch = useRef(false);
-  const captureGradeRef = useRef<CaptureFeedback["grade"] | null>(null);
 
   sideRef.current = side;
   bestsRef.current = bests;
@@ -174,8 +175,6 @@ export function EarCaptureApp() {
     sweepRef.current = EMPTY_SWEEP;
     capturedThisSideRef.current = false;
     wasReadyRef.current = false;
-    softSuccessLatch.current = false;
-    captureGradeRef.current = null;
     setRelearnArmed(false);
     setLive({
       ...INITIAL_LIVE,
@@ -212,19 +211,17 @@ export function EarCaptureApp() {
   }, []);
 
   const personalBest = side ? bests[side] : null;
-  const captureUi = captureUiFor(personalBest !== null, live.allowCapture);
-  const captureHint = !side
-    ? t("PICK_SIDE")
-    : live.softSuccess
-      ? t("softSuccess")
-      : t(captureHintKey(captureUi));
+  const captureUi = captureUiFor(
+    personalBest !== null,
+    live.allowCapture,
+    live.softReady,
+  );
+  const captureHint = side ? t(captureHintKey(captureUi)) : t("PICK_SIDE");
   const promptText =
     live.captured && !live.stuck
-      ? captureFeedback?.grade === "offPeak"
-        ? t("captureOffPeak")
-        : live.softSuccess
-          ? t("SOFT_READY")
-          : t("captureNearPeak")
+      ? captureFeedback
+        ? t(captureResultKey(captureFeedback))
+        : t("captureNearPeak")
       : t(live.prompt);
 
   const liveRef = useRef(live);
@@ -271,13 +268,15 @@ export function EarCaptureApp() {
       snap.quality && snap.yaw != null
         ? frontalQualityScore(snap.quality, snap.yaw)
         : (peak?.score ?? 0);
-    const feedback = captureFeedbackFor(
-      chosen,
-      capturedScore,
-      peak?.score ?? null,
+    setCaptureFeedback(
+      captureFeedbackFor(
+        chosen,
+        capturedScore,
+        peak?.score ?? null,
+        poseConfig.ready.scoreRatioOfBest,
+        snap.softReady,
+      ),
     );
-    captureGradeRef.current = feedback.grade;
-    setCaptureFeedback(feedback);
   }, [videoRef]);
 
   const captureStillRef = useRef(captureStill);
@@ -575,20 +574,6 @@ export function EarCaptureApp() {
         displayPrompt = liveRef.current.prompt;
       }
 
-      const softReadyNow =
-        allowCapture && !stuck && guidance.prompt === "SOFT_READY";
-      softSuccessLatch.current = stepSoftSuccessLatch(
-        softSuccessLatch.current,
-        softReadyNow,
-        captured,
-      );
-      const offPeakShot =
-        captured && captureGradeRef.current === "offPeak";
-      const softSuccess =
-        !stuck &&
-        !offPeakShot &&
-        showSoftSuccess(softSuccessLatch.current, softReadyNow, captured);
-
       setLive({
         yaw,
         pitch,
@@ -600,7 +585,7 @@ export function EarCaptureApp() {
         faceHeightRatio: heightRatio,
         shutterCountdownMs: shutter.fire ? null : shutter.remainingMs,
         stuck,
-        softSuccess,
+        softReady: allowCapture && guidance.prompt === "SOFT_READY",
         captured,
       });
     };
@@ -627,8 +612,6 @@ export function EarCaptureApp() {
   const retryStuck = () => {
     const current = sideRef.current;
     if (!isSideChosen(current)) return;
-    softSuccessLatch.current = false;
-    captureGradeRef.current = null;
     const now = performance.now();
     progressRef.current = retryProgress(progressRef.current, now);
     introUntilRef.current = sideIntroUntil(now);
@@ -643,15 +626,13 @@ export function EarCaptureApp() {
       stuck: false,
       prompt: intro,
       allowCapture: false,
-      softSuccess: false,
+      softReady: false,
     }));
   };
 
   const retake = () => {
     setLastCapture(null);
     setCaptureFeedback(null);
-    captureGradeRef.current = null;
-    softSuccessLatch.current = false;
     capturedThisSideRef.current = false;
     shutterLatch.current = false;
     cancelReadyEpisode.current = false;
@@ -722,8 +703,7 @@ export function EarCaptureApp() {
       <p className="status">{status}</p>
 
       <section
-        className={`stage${live.softSuccess ? " soft-success" : live.allowCapture ? " ready" : ""}${live.stuck ? " stuck" : ""}`}
-        data-soft-success={live.softSuccess}
+        className={`stage${live.softReady ? " soft" : live.allowCapture ? " ready" : ""}${live.stuck ? " stuck" : ""}`}
       >
         <video
           ref={videoRef}
@@ -754,8 +734,8 @@ export function EarCaptureApp() {
         ) : (
           <div
             className="prompt"
-            data-ready={live.allowCapture && !live.softSuccess}
-            data-soft-success={live.softSuccess && !live.captured}
+            data-ready={live.allowCapture && !live.softReady}
+            data-soft={live.softReady}
             data-stuck={live.stuck}
             data-captured={live.captured && !live.stuck}
           >
@@ -783,14 +763,6 @@ export function EarCaptureApp() {
                 {t("relearnCancel")}
               </button>
             ) : null}
-          </div>
-        ) : null}
-        {live.softSuccess ? (
-          <div className="soft-success" role="status">
-            <span className="soft-success-mark" aria-hidden="true">
-              ✓
-            </span>
-            <span>{t("softSuccess")}</span>
           </div>
         ) : null}
         {live.shutterCountdownMs !== null ? (
@@ -835,7 +807,7 @@ export function EarCaptureApp() {
         ) : (
           <button
             type="button"
-            className={`capture${live.softSuccess && live.allowCapture ? " soft-success" : ""}`}
+            className={`capture${live.softReady ? " soft" : ""}`}
             disabled={!live.allowCapture}
             title={captureHint}
             aria-label={captureHint}
@@ -904,11 +876,7 @@ export function EarCaptureApp() {
           <figcaption>
             {captureFeedback && side && captureFeedback.side === side ? (
               <>
-                <strong>
-                  {captureFeedback.grade === "nearPeak"
-                    ? t("captureNearPeak")
-                    : t("captureOffPeak")}
-                </strong>
+                <strong>{t(captureResultKey(captureFeedback))}</strong>
                 <span>{t("lastCaptureCaption")}</span>
               </>
             ) : (
