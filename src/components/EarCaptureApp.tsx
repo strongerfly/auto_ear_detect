@@ -222,7 +222,9 @@ export function EarCaptureApp() {
     live.captured && !live.stuck
       ? captureFeedback?.grade === "offPeak"
         ? t("captureOffPeak")
-        : t("captureNearPeak")
+        : live.softSuccess
+          ? t("SOFT_READY")
+          : t("captureNearPeak")
       : t(live.prompt);
 
   const liveRef = useRef(live);

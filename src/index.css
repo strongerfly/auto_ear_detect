@@ -422,9 +422,9 @@ h1 {
 
 .soft-success {
   position: absolute;
-  left: 50%;
-  bottom: 108px;
-  z-index: 3;
+  top: 12px;
+  right: 12px;
+  z-index: 4;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -460,15 +460,15 @@ h1 {
 
 @keyframes soft-success-pop {
   0% {
-    transform: translateX(-50%) scale(0.82);
+    transform: scale(0.82);
     opacity: 0;
   }
   70% {
-    transform: translateX(-50%) scale(1.05);
+    transform: scale(1.05);
     opacity: 1;
   }
   100% {
-    transform: translateX(-50%) scale(1);
+    transform: scale(1);
     opacity: 1;
   }
 }
@@ -491,10 +491,7 @@ h1 {
   .capture.soft-success:not(:disabled),
   .soft-success {
     animation: none;
-  }
-
-  .soft-success {
-    transform: translateX(-50%);
+    transform: none;
   }
 }
 
