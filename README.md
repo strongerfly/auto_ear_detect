@@ -117,3 +117,7 @@ src/components/EarCaptureApp.tsx
 Unit tests (`npm test`) cover Euler, prompt flow, bestYaw (including a 45° peak), locale lookup, dwell, and ROI quality — no camera required.
 
 The in-app **pose simulator** can vary quality with yaw so you can watch READY fire away from a fixed high-yaw band.
+
+## Workstation robot PoC
+
+A separate short-term **seated workstation** simulation (collaborative arm + wrist RGB-D, offline Python only) lives in [`robot-ear-workstation-poc/`](robot-ear-workstation-poc/README.md). It reuses the ear-ROI score idea; it does not change this phone/web capture app. Scope and limits are in that folder’s README.

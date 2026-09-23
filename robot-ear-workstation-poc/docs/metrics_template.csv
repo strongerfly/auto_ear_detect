@@ -1,0 +1,2 @@
+session_id,timestamp_local,side,consent,success,time_to_capture_s,min_hri_distance_mm,peak_yaw_deg,peak_combined_score,burst_best_score,lost_track_events,operator_abort,notes,measured_or_sim
+sim-001,2026-09-22T13:58:00+08:00,rightEar,true,true,0.0,999,55.0,0.0,0.0,0,false,SIM placeholder row — replace scores from demo,sim
