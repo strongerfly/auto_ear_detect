@@ -14,7 +14,7 @@
 |------|------|
 | 工位 PoC `robot-ear-workstation-poc/` | [PR #15](https://github.com/strongerfly/auto_ear_detect/pull/15)，2026-09-23 合入 |
 | Android Capacitor debug APK | [PR #16](https://github.com/strongerfly/auto_ear_detect/pull/16)，2026-09-23 合入；README「Android debug APK」、`artifacts/app-debug.apk` |
-| 鸿蒙 HAP | **仍未**可装，**未**支持。`harmony/` 只是 ArkTS Web 壳脚手架（B1）+ dist→rawfile 同步（B2）+ 证书名单（A0）。HM-IX-0 真机冒烟未跑，卡在 `docs/harmony-next-path.md` §1.3。Android APK 不能装纯血 NEXT。 |
+| 鸿蒙 HAP | **仍未**可装，**未**支持。HM-IX-0 冒烟未跑（卡在 `docs/harmony-next-path.md` §1.3）。HM-IX-1 只做到文档口径：不宣称已支持。`harmony/` 是脚手架，不是旧本地树。Android APK 不能装纯血 NEXT。 |
 
 ---
 
@@ -44,7 +44,7 @@
 | P1 | ticket-b | soft-success 可感知 | PR 合入；用户可感知 | 快照：待额度通后。2026-09-23 仍未合入 main；若有 open PR，以该 PR 与总管进度板为准 |
 | P1 | ticket-c | 模拟器收起文案 | PR；建议在 B 后 | 待办（快照；2026-09-23 仍未见合入 main） |
 | P2 | python | Python 桌面版 | 可运行说明 + 代码/PR | 快照：Android 完成后。APK 已在 main，本项是否开工以总管进度板为准 |
-| P2 | harmony | 鸿蒙壳脚手架 | B1+B2+A0 进仓；可装 HAP 另票 | 脚手架与清单可合入。可装 HAP、真机冒烟、DevEco 模拟器都搁置，直到 §1.3。不要写成已支持 |
+| P0 | harmony-next-smoke | HM-IX-0 真机冒烟 | 可侧载调试 HAP + 相机与拍耳跑通 | **未突破。** 云端只有脚手架和 §1.3 清单。HM-IX-2/3 等失败分类或绿灯。不要写成已支持 |
 | later | robot-mid | 中期 NBV/耳分割/AE | PoC 指标后再拆 | **不做**底盘/医疗耳镜 |
 
 ---

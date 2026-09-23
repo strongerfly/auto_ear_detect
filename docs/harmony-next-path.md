@@ -62,9 +62,33 @@ Store listing is a later vendor step. It is not a way to skip the list.
 
 Product lines that are not breakthrough items: fixed 70–90° READY, medical / otoscope imaging.
 
-### HM-IX-0
+### HM-IX-0 prep vs acceptance
 
-Blocked on §1.3. Not run. Failure classes (permission / WebView / WASM or model / tracking) are not known yet, so HM-IX-2 / HM-IX-3 stay unscheduled.
+Sideloadable debug HAP was the aim. This Linux VM cannot install DevEco, sign, or assemble one. Prep that does not need that toolchain is in the scaffold. Acceptance is not met.
+
+| Prep | Where | Cloud status |
+|------|--------|----------------|
+| Relative asset base | Vite `base: "./"`; built `index.html` uses `./assets/…`; local model URL is `` `${import.meta.env.BASE_URL}models/face_landmarker.task` `` | Written and checked in a local `npm run build`. Not loaded inside ArkWeb. |
+| `.task` | Synced only if `public/models/face_landmarker.task` exists. This tree has no `.task` file (only `public/favicon.svg`). Loader HEAD-checks the relative URL, then falls back to Google’s model host. | Strategy only. ArkWeb may reject HEAD and force the remote URL even after a file is synced. |
+| WASM | Not bundled. `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm`. First launch needs a network. `INTERNET` is declared. Rawfile origin plus HTTPS WASM is unverified (mixed content). | Strategy only. |
+| Camera declaration | `harmony/entry/src/main/module.json5`: `ohos.permission.CAMERA` (in use) and `ohos.permission.INTERNET`. Ability calls `requestPermissionsFromUser`. The Web page grants `getUserMedia` resources in `onPermissionRequest`. | Declared. Not granted on a device. |
+| Debug signing | Names only in [harmony-signing-secrets.md](./harmony-signing-secrets.md). `signingConfigs` is `[]`. No UDID, no `.p12` / `.cer` / `.p7b`. | Notes only. No sideload path. |
+
+The old local `harmony/` tree outside this repo is not the success case and is not imported.
+
+Acceptance target, all open, blocked on §1.3:
+
+- [ ] Install on a HarmonyOS NEXT phone and cold-start into the ear UI (中文 / English)
+- [ ] First camera prompt: allow → mirrored preview; deny → recoverable copy (not a dead grey shutter)
+- [ ] Pick a side → slow turn → personal peak → READY **or** SOFT_READY from quality, with no 70–90° hard gate
+- [ ] Capture a still and preview or save it; post-capture feedback stays relative to the peak (no degrees)
+- [ ] A hard failure names the cause: permission, WebView, WASM or model, or tracking
+
+Those failure sentences are **not** in the app yet. Today `cameraDenied` says to allow the site in **browser** settings. That is the web/Android line. It is not Harmony recovery copy. HM-IX-2 / HM-IX-3 stay waiting until a device run produces a failure taxonomy or a green path.
+
+### HM-IX-1
+
+Docs match the board: no device run means not supported. LIMITS, both READMEs, and `harmony/README.md` say the Android debug APK does not install on pure HarmonyOS NEXT; use the phone browser or that APK until a signed HAP exists. In-app strings do not mention Harmony and do not say the product is supported there. No new in-app Harmony gate was added. Store listing stays unclaimed.
 
 ## 中文
 
@@ -114,6 +138,30 @@ Android debug APK **不能**装到纯血鸿蒙 NEXT。
 
 固定 70–90° READY、医疗 / 耳镜，不是突破项，是产品禁区。
 
-### HM-IX-0
+### HM-IX-0 前置和验收
 
-依赖 §1.3，本轮未跑。失败类型（权限 / WebView / WASM 或模型 / 跟踪）还不知道，所以 HM-IX-2 / HM-IX-3 先不做。
+目标曾经是可侧载的调试 HAP。这台 Linux VM 不能装 DevEco、不能签名、也不能打出包。不依赖工具链的前置写在脚手架里。验收没有达到。
+
+| 前置 | 位置 | 云端状态 |
+|------|------|----------|
+| 相对路径资源 | Vite `base: "./"`；构建出的 `index.html` 使用 `./assets/…`；本地模型地址是 `` `${import.meta.env.BASE_URL}models/face_landmarker.task` `` | 本地 `npm run build` 核对过。没有在 ArkWeb 里加载过。 |
+| `.task` | 只有 `public/models/face_landmarker.task` 存在时，同步才会把它拷进去。当前树里没有 `.task`（只有 `public/favicon.svg`）。加载器先对相对地址做 HEAD，失败则回退到 Google 模型主机。 | 只写策略。ArkWeb 可能拒绝 HEAD，即使文件已同步也走远程地址。 |
+| WASM | 不打进包。地址是 `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm`。第一次打开需要网络。已声明 `INTERNET`。rawfile 源站再拉 HTTPS WASM 是否算混合内容，未验证。 | 只写策略。 |
+| 相机声明 | `harmony/entry/src/main/module.json5`：`ohos.permission.CAMERA`（使用中）和 `ohos.permission.INTERNET`。Ability 调用 `requestPermissionsFromUser`。网页 `getUserMedia` 时在 `onPermissionRequest` 授权。 | 已声明。没有在真机上点过允许。 |
+| 调试签名 | 只在 [harmony-signing-secrets.md](./harmony-signing-secrets.md) 列名字。`signingConfigs` 是 `[]`。没有 UDID，没有 `.p12` / `.cer` / `.p7b`。 | 只有说明。没有侧载路径。 |
+
+仓库外的旧 `harmony/` 树不是成功标准，也没有导入。
+
+验收目标全部未勾，卡在 §1.3：
+
+- [ ] 装上纯血 NEXT 手机，冷启动进拍耳界面（中文 / English）
+- [ ] 第一次相机权限：允许 → 镜像预览；拒绝 → 可恢复文案（不是死灰）
+- [ ] 选侧 → 慢转 → 个人峰 → READY **或** SOFT_READY（质量驱动，无 70–90° 硬门）
+- [ ] 拍下静帧并能预览或保存；拍后反馈相对峰值（无度数）
+- [ ] 硬失败能归因：权限、WebView、WASM 或模型、跟踪
+
+这些失败句 **还没有** 写进应用。现在的 `cameraDenied` 是「到浏览器设置里允许这个网站」。那是 Web/Android 的句子，不是鸿蒙恢复文案。HM-IX-2 / HM-IX-3 等真机给出失败分类或绿灯路径后再做。
+
+### HM-IX-1
+
+文档和进度板一致：没真机跑通 = 未支持。LIMITS、两份 README、`harmony/README.md` 都写了 Android debug APK 不能装纯血 NEXT；在有签名 HAP 之前用手机浏览器或那个 APK。应用内文案不提鸿蒙，也不说鸿蒙已支持。本轮没有加应用内的鸿蒙门闩。没有写上架。
