@@ -69,7 +69,13 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 
 这是调试签名（Gradle 的 debug keystore），不是上架用的正式包。CI 不会启动模拟器，也不会打开摄像头。WebView 的 GPU 委托失败时，应用会按原逻辑退回 CPU。
 
-无需 API 密钥。Face Landmarker 的 WASM 从 jsDelivr 加载；`.task` 模型优先使用 `public/models/`，否则回退到 Google MediaPipe 模型主机。
+无需 API 密钥。Face Landmarker 的 WASM 从 jsDelivr 加载；`.task` 模型优先使用 `public/models/`，否则回退到 Google MediaPipe 模型主机。本地模型地址跟着 Vite `base` 走（与 `index.html` 同级的 `./models/face_landmarker.task`）。
+
+## HarmonyOS NEXT 壳（现在不能装）
+
+`harmony/` 是给纯血鸿蒙 NEXT 用的 ArkTS Web 壳脚手架。**不是**已支持的构建，**也不是**可安装的 HAP。没有官方 Capacitor → HarmonyOS NEXT 路径。上面的 Android debug APK **不能**装到纯血 NEXT。在有签名 HAP 之前，用手机浏览器或这个 Android APK。
+
+`npm run harmony:sync` 把 `dist/` 拷进壳的 `rawfile/`。它不跑 `hvigorw`。证书只列名字、仓库里没有证书：[docs/harmony-signing-secrets.md](docs/harmony-signing-secrets.md)。突破条件仍全部未勾：[docs/harmony-next-path.md](docs/harmony-next-path.md)。以后在本机 DevEco 或命令行出包的步骤：[harmony/README.md](harmony/README.md)。
 
 ## 左右约定（FISWG）
 
@@ -142,6 +148,8 @@ src/lib/personal-best.ts      按耳区质量更新 bestYaw
 src/lib/quality.ts            Laplacian / 边缘 / 加权分数
 docs/LIMITS.md                blockers, ceiling, next steps (EN)
 docs/LIMITS.zh-CN.md          卡点 / 上限 / 短板 / 后续
+docs/harmony-next-path.md     鸿蒙 NEXT 脚手架与 §1.3 清单（不是 HAP）
+harmony/                      ArkTS Web 壳脚手架（不是可装 HAP）
 src/components/EarCaptureApp.tsx
 ```
 

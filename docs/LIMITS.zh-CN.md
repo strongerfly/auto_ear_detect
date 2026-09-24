@@ -96,15 +96,17 @@ English twin: [LIMITS.md](./LIMITS.md).
 
 不属于上面 1–8。只写发行/打包上限，不是拍耳质量上限。
 
-**今天的发行天花板：Web + Android。** 浏览器拍耳，以及已在 `main` 的 Android debug APK，是当前可交付主路径。鸿蒙不是当前已支持平台。
+**今天的发行天花板：Web + Android。** 浏览器拍耳，以及已在 `main` 的 Android debug APK，是当前可交付主路径。鸿蒙不是当前已支持平台。这个 APK 不能装到纯血鸿蒙 NEXT。
 
-路径 B：云端本迭代交付可审的 ArkWeb/Web 薄壳脚手架、同步脚本、构建菜谱与本 LIMITS。可安装 HAP 在本机 DevEco，或已配签名 Secrets 的专用 CI 上打。不能声称 Cursor 默认云端 VM 已能编出可装 HAP。Ionic 官方没有 HarmonyOS NEXT 的 Capacitor 计划；社区 OpenHarmony/Oniro 适配不是华为纯血上架路径。不能写成官方 Capacitor 鸿蒙，也不能写成可上架。
+路径 B：`harmony/` 是可审的 ArkWeb/Web 薄壳脚手架，加上 dist→rawfile 同步。它不是 HAP，也不是把仓库外旧壳当「已支持」拣回来。可安装 HAP 在本机 DevEco，或已配签名 Secrets 的专用 CI 上打。不能声称 Cursor 默认云端 VM 已能编出可装 HAP。Ionic 官方没有 HarmonyOS NEXT 的 Capacitor 计划；社区 OpenHarmony/Oniro 适配不是华为纯血上架路径。不能写成官方 Capacitor 鸿蒙，也不能写成可上架。
 
-- **卡点：** 无官方 Capacitor→HarmonyOS NEXT。需要华为 Command Line Tools / SDK（或本机 DevEco）和签名。本仓库默认 CI 不出 HAP。鸿蒙真机上的相机权限与拍耳主路径未验收。
+**HM-IX-0 真机冒烟没有跑过。** 在 [harmony-next-path.md](./harmony-next-path.md) §1.3 全部勾上之前，这一项保持阻断。签名证书和真机 UDID 目前都没有。本轮不编造。
+
+- **卡点：** 无官方 Capacitor→HarmonyOS NEXT。需要华为 Command Line Tools / SDK（或本机 DevEco），以及签名三件套（`.p12` / `.cer` / `.p7b`）和密码。默认 CI 只把网页构建同步进 `rawfile`，不跑 `hvigorw`，也不上传 HAP。这台云端 VM 不是构建机，也不是模拟器主机。鸿蒙真机上的相机权限与拍耳主路径未验收。
 - **当前上限：** Web 与 Android debug APK（`main`）。鸿蒙最多是进行中的壳工程。脚手架进仓 ≠ 已支持鸿蒙，≠ 已有可装 HAP，≠ 可上架。
-- **短板：** 签名材料、真机 UDID/Profile、ArkWeb 内相机权限，以及 MediaPipe WASM 行为，均未在本仓库真机验收。
-- **后续：** 工程路径文档合入后在此交叉引用（占位）。未满足突破条件前，不改口成已支持、可装或可上架。
-- **突破条件（全部满足才可改口「有可装调试 HAP」）：** 华为 CLI/SDK（或本机 DevEco）可用；签名三件套（调试/发布证书材料，如 `.p12` / `.cer` / `.p7b` 或等价 Profile）可非交互签名；产出可安装 HAP；真机上相机权限声明生效，且拍耳主路径（Web 壳内 getUserMedia + 现有质量峰流程）能跑通一次。应用市场上架仍是更后的步骤，上述未齐前不做。
+- **短板：** 签名材料、真机 UDID/Profile、ArkWeb 内相机权限，以及 MediaPipe WASM 行为，均未在本仓库真机验收。应用里的 `cameraDenied` 是「到浏览器设置里允许这个网站」，只覆盖 Web/Android。它不是鸿蒙恢复文案。真机跑出失败分类之前，不加鸿蒙特有失败句（HM-IX-2）。
+- **后续：** 出包步骤和 §1.3 清单在 [harmony-next-path.md](./harmony-next-path.md)。材料只列名字，见 [harmony-signing-secrets.md](./harmony-signing-secrets.md)。未满足突破条件前，不改口成已支持、可装或可上架。
+- **突破条件（全部满足才可改口「有可装调试 HAP」）：** 华为 CLI/SDK（或本机 DevEco）在持久构建机上可用，不是每次换一台新的 Cursor VM；签名三件套可非交互签名；一台验收机（真机 UDID 写进调试 Profile，或本机 DevEco 模拟器——不是这台 VM）；`harmony/` 配合网页同步真能打出包；有 `assembleHap` 日志 + 签名后的 HAP + `hdc install`；真机上相机权限生效，且拍耳主路径（Web 壳内 getUserMedia + 现有质量峰流程，READY 或 SOFT_READY，无 70–90° 硬门）能跑通一次。应用市场上架仍是更后的步骤，上述未齐前不做。
 
 ## 天花板内下一刀（可落地，非上面 1–8）
 - #7 文案键对齐合入

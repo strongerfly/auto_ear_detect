@@ -29,3 +29,9 @@ coverage
 
 # Models (kept in public/models if committed)
 # face_landmarker.task is committed for offline demo reliability
+
+# Harmony signing material. Names only: docs/harmony-signing-secrets.md
+*.p12
+*.p7b
+*.csr
+*.cer

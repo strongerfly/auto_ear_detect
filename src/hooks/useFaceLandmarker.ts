@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 
 const WASM_CDN =
   "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm";
-const LOCAL_MODEL = "/models/face_landmarker.task";
+const LOCAL_MODEL = `${import.meta.env.BASE_URL}models/face_landmarker.task`;
 const REMOTE_MODEL =
   "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 

@@ -69,7 +69,13 @@ Or copy the APK onto the phone and open it (allow install from that source). Min
 
 This is a debug-signed APK (Gradle’s debug keystore), not a Play Store release. CI does not boot an emulator or open the camera. If the WebView GPU delegate fails, the app already falls back to CPU.
 
-No API keys. Face Landmarker WASM loads from jsDelivr; the `.task` model is served from `public/models/` when present, otherwise Google’s MediaPipe model host.
+No API keys. Face Landmarker WASM loads from jsDelivr; the `.task` model is served from `public/models/` when present, otherwise Google’s MediaPipe model host. The local model URL follows Vite `base` (`./models/face_landmarker.task` next to `index.html`).
+
+## HarmonyOS NEXT shell (not installable)
+
+`harmony/` is an ArkTS Web shell scaffold for HarmonyOS NEXT. It is **not** a supported build and **not** an installable HAP. There is no official Capacitor path to HarmonyOS NEXT. The Android debug APK above does **not** install on pure HarmonyOS NEXT. Until a signed HAP exists, use the phone browser or that Android APK.
+
+`npm run harmony:sync` copies `dist/` into the shell’s `rawfile/`. It does not run `hvigorw`. Signing names, without certificates: [docs/harmony-signing-secrets.md](docs/harmony-signing-secrets.md). Breakthrough checklist (all still open): [docs/harmony-next-path.md](docs/harmony-next-path.md). Steps for a later DevEco or CLI build: [harmony/README.md](harmony/README.md).
 
 ## Left / right convention (FISWG)
 
@@ -142,6 +148,8 @@ src/lib/personal-best.ts      running bestYaw from ROI quality
 src/lib/quality.ts            Laplacian / edges / weighted score
 docs/LIMITS.md                blockers, ceiling, next steps (EN)
 docs/LIMITS.zh-CN.md          卡点 / 上限 / 短板 / 后续
+docs/harmony-next-path.md     Harmony NEXT scaffold + §1.3 checklist (not a HAP)
+harmony/                      ArkTS Web shell scaffold (not an installable HAP)
 src/components/EarCaptureApp.tsx
 ```
 
