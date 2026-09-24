@@ -92,19 +92,21 @@ To break through: Long-term same-person same-device signals.
 Cannot-do: Only “not found this time” + change light / clear hair / relearn.
 To break through: An attributable quality head or segmentation.
 
-## HarmonyOS shell (packaging ceiling)
+## HarmonyOS shell (packaging ceiling · path B)
 
-Not one of items 1–8. Shipping ceiling only. Do not read it as capture-quality work.
+Not one of items 1–8. Shipping and packaging ceiling only. Do not read it as capture-quality work.
 
-Cannot claim a store-ready, installable, or officially supported HarmonyOS build. **HM-IX-0 device smoke has not been run.** It stays blocked until every box in [harmony-next-path.md](./harmony-next-path.md) §1.3 is checked. Signing certificates and a device UDID are not in hand; this PR does not wait on them and does not invent them.
+**Shipping ceiling today: Web + Android.** Browser capture, plus the Android debug APK already on `main`, is the deliverable path. Harmony is not a supported platform today. That APK does not install on HarmonyOS NEXT.
 
-`harmony/` is an ArkTS **Web shell scaffold** plus a dist→rawfile sync. It is not a HAP, and it is not the old local tree brought back as support.
+Path B: `harmony/` is a reviewable ArkWeb/Web thin-shell scaffold plus a dist→rawfile sync. It is not a HAP, and it is not an old local tree brought back as support. An installable HAP is produced on a local DevEco machine, or on a dedicated CI that already has signing secrets. Do not claim the default Cursor cloud VM can build an installable HAP. Ionic has no HarmonyOS NEXT Capacitor plan. Community OpenHarmony/Oniro adapters are not the Huawei store path. Do not write this as official Capacitor Harmony, or as store-ready.
 
-- **Blockers:** An installable HAP needs Huawei Command Line Tools or DevEco Studio, a HarmonyOS NEXT SDK, and a signing trio (`.p12` / `.cer` / `.p7b`) with passwords. There is no official Capacitor HarmonyOS NEXT path. CI syncs the web build into `rawfile` only. It does not run `hvigorw` and does not upload a HAP. This cloud VM is not the build machine and not an emulator host.
-- **Ceiling today:** Phone/web capture, plus the Android debug APK already on `main`. That APK does not install on HarmonyOS NEXT. No signed Harmony package is produced here.
-- **Shortfalls:** Camera permission, ArkWeb `getUserMedia`, and MediaPipe WASM inside the shell are unverified on a device. A directory outside the repo is not evidence of support. The scaffold must not be described as support. In-app `cameraDenied` tells the user to allow the site in browser settings. That sentence is the web/Android path. It is not Harmony recovery copy, and this tree does not add Harmony-specific failure lines before a device run (HM-IX-2).
-- **Next:** Recipe and the §1.3 checklist: [harmony-next-path.md](./harmony-next-path.md). Material names only: [harmony-signing-secrets.md](./harmony-signing-secrets.md). Installable HAP (A1), on-device smoke, and a DevEco emulator run are shelved until those conditions exist.
-- **Breakthrough conditions (§1.3, all required before any “supported” or “installable HAP” wording):** a Huawei account that can download Linux Command Line Tools and the matching NEXT SDK; a persistent toolchain (not a fresh Cursor VM); debug or release signing trio injected as secrets; one acceptance device (handset UDID on the debug profile, or a local DevEco emulator — not this VM); `harmony/` actually assembling with the web sync; one evidence set of `assembleHap` log + signed HAP + `hdc install`, then camera permission and the capture flow on that device. Store listing stays out of scope until then.
+**HM-IX-0 device smoke has not been run.** It stays blocked until every box in [harmony-next-path.md](./harmony-next-path.md) §1.3 is checked. Signing certificates and a device UDID are not in hand. This work does not invent them.
+
+- **Blockers:** No official Capacitor → HarmonyOS NEXT path. Needs Huawei Command Line Tools / SDK (or local DevEco) plus the signing trio (`.p12` / `.cer` / `.p7b`) and passwords. Default CI syncs the web build into `rawfile` only. It does not run `hvigorw` and does not upload a HAP. This cloud VM is not the build machine and not an emulator host. On-device Harmony camera permission and the ear-capture path are not accepted here.
+- **Ceiling today:** Web and the Android debug APK on `main`. Harmony is at most an in-progress shell. A scaffold in the tree ≠ supported Harmony, ≠ an installable HAP, ≠ store-ready.
+- **Shortfalls:** Signing materials, device UDID/Profile, in-ArkWeb camera permission, and MediaPipe WASM behavior are not verified on a real device in this repo. In-app `cameraDenied` tells the user to allow the site in browser settings. That sentence is the web/Android path. It is not Harmony recovery copy, and this tree does not add Harmony-specific failure lines before a device run (HM-IX-2).
+- **Next:** Recipe and the §1.3 checklist: [harmony-next-path.md](./harmony-next-path.md). Material names only: [harmony-signing-secrets.md](./harmony-signing-secrets.md). Do not change the claim to supported, installable, or store-ready until the breakthrough conditions are met.
+- **Breakthrough conditions** (all of them, before saying there is an installable debug HAP): Huawei CLI/SDK (or local DevEco) available on a persistent builder, not a fresh Cursor VM; the signing trio can sign non-interactively; one acceptance device (handset UDID on the debug profile, or a local DevEco emulator — not this VM); `harmony/` actually assembles after the web sync; evidence of `assembleHap` + signed HAP + `hdc install`; on-device camera permission takes effect, and the ear-capture main path (getUserMedia inside the web shell plus the existing quality-peak flow, READY or SOFT_READY, no 70–90° hard gate) runs through once. Store listing is a later step and stays out of scope until those conditions exist.
 
 ## Next cuts within the ceiling (shippable; not items 1–8 above)
 - #7 string-key alignment landed
