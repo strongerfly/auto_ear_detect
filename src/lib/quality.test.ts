@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyEarQuality, frontalQualityScore, measureEarQuality, qualityAlongYawCurve } from "./quality";
+import { classifyEarQuality, frontalQualityScore, measureEarQuality, qualityAlongYawCurve, smoothEarQuality } from "./quality";
 import { poseConfig } from "../config";
 
 function solid(
@@ -85,5 +85,15 @@ describe("ear ROI quality", () => {
     expect(frontalQualityScore(at45, 45)).toBeGreaterThan(
       frontalQualityScore(at80, 80),
     );
+  });
+
+  it("smooths a one-frame sharpness spike halfway toward the previous sample", () => {
+    const previous = { laplacian: 100, brightness: 120, edgeEnergy: 20 };
+    const spike = { laplacian: 400, brightness: 120, edgeEnergy: 80 };
+    const blended = smoothEarQuality(previous, spike, poseConfig.score.smoothAlpha);
+    expect(blended.laplacian).toBe(250);
+    expect(blended.edgeEnergy).toBe(50);
+    expect(smoothEarQuality(null, spike, 0.5)).toEqual(spike);
+    expect(smoothEarQuality(previous, spike, 1)).toEqual(spike);
   });
 });

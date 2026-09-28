@@ -48,6 +48,7 @@
       "borderDominatesAbove": 2
     },
     "scoreMinAbsolute": 0.35,
+    "smoothAlpha": 0.5,
     "softSuccessBelow": 0.55,
     "updateBestOnlyIfPoseOk": true,
     "ignoreFrameIfFaceLost": true

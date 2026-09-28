@@ -113,7 +113,7 @@ READY when all of:
 4. Stable ~**12** frames to enter. One jitter does not wipe the count or grey a shutter that was already good
 5. Score ≥ **92%** of the personal peak to enter, and stays allowed down to **86%** once capture was already allowed; brightness in range
 
-No “confirm the ear is frontal” step. Until a peak is locked, prompts are **sweep only** (no prior-driven turn-back). After lock, going past `bestYaw` by `overshootPastBestDeg` with a score drop says ease back; returning toward best is HOLD, not MORE. Auto-shutter waits 3 ready frames, then a cancelable **`autoshutterMs`** countdown. **Relearn this side** asks for a second confirm before clearing the stored peak; learning itself is automatic. The absolute-angle HUD is hidden unless you turn on **Debug: show angles**. Grey capture explains learning vs near-peak vs ready — grey hold uses **NEAR_PEAK** (「快到了…」), never **HOLD_STILL**. `minSweepCoverageRatio` is **not** a hard READY gate.
+No “confirm the ear is frontal” step. Until a peak is locked, prompts are **sweep only** (no prior-driven turn-back). After lock, going past `bestYaw` by `overshootPastBestDeg` with a score drop says ease back; returning toward best is HOLD, not MORE. Auto-shutter waits 3 ready frames, then a cancelable **`autoshutterMs`** countdown. The saved photo is the sharpest of that short burst (`pickBurstBy: score`), including a fresh measurement at the shutter. **Relearn this side** asks for a second confirm before clearing the stored peak; learning itself is automatic. A clipped ear, a lost face, or the frames right after a brief tracking blip do not move the remembered peak. The absolute-angle HUD is hidden unless you turn on **Debug: show angles**. Grey capture explains learning vs near-peak vs ready — grey hold uses **NEAR_PEAK** (「快到了…」), never **HOLD_STILL**. `minSweepCoverageRatio` is **not** a hard READY gate.
 
 ## Ceiling and shortfalls（上限与短板）
 
@@ -133,7 +133,7 @@ Numeric thresholds: **`src/config/pose-config.json`**. User-visible strings: **`
 | READY vs personal peak | `ready.bandDegAroundBest`, `ready.exitBandDeg`, `ready.scoreRatioOfBest`, `ready.scoreRatioExit` |
 | Steadier peak / less grey flicker | `personalBest.confirmFrames`, `confirmYawDeg`, `rescoreFloorRatio`, `ready.stableDecay`, `ready.stableHoldFrames` |
 | Overshoot past best | `search.overshootPastBestDeg` |
-| Auto-shutter countdown | `ready.autoshutterMs`, `ready.burstFrames` |
+| Auto-shutter countdown / burst pick | `ready.autoshutterMs`, `ready.burstFrames`, `ready.pickBurstBy` |
 | Less flicker | `promptUx.minDwellMs`, `crossFamilyDwellMs`, `slowDownPreemptMs`, `slowDownHoldMs`, `smoothing.oneEuro` |
 | Sharpness floor | `score.sharp`, `score.struct` |
 | Copy | `src/i18n/messages.ts` |

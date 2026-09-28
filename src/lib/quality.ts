@@ -31,6 +31,33 @@ function spatialWeight(x: number, y: number, w: number, h: number): number {
   return 1 - 0.75 * r;
 }
 
+/**
+ * Short blend so one noisy ROI sample does not dominate the personal peak.
+ * Burst selection keeps using the raw measurement. `alpha` 1 returns `next`.
+ */
+export function smoothEarQuality(
+  previous: EarQuality | null,
+  next: EarQuality,
+  alpha: number,
+): EarQuality {
+  if (!previous || !(alpha < 1)) return next;
+  const a = Math.min(1, Math.max(0, alpha));
+  const mix = (prev: number, sample: number) => a * sample + (1 - a) * prev;
+  const mixOpt = (prev: number | undefined, sample: number | undefined) => {
+    if (sample === undefined) return prev;
+    if (prev === undefined) return sample;
+    return mix(prev, sample);
+  };
+  return {
+    laplacian: mix(previous.laplacian, next.laplacian),
+    brightness: mix(previous.brightness, next.brightness),
+    edgeEnergy: mix(previous.edgeEnergy, next.edgeEnergy),
+    centerBrightness: mixOpt(previous.centerBrightness, next.centerBrightness),
+    centerSharpness: mixOpt(previous.centerSharpness, next.centerSharpness),
+    borderSharpness: mixOpt(previous.borderSharpness, next.borderSharpness),
+  };
+}
+
 export function unitInterval(
   value: number,
   min: number,

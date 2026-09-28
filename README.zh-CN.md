@@ -113,7 +113,7 @@ Euler 顺序为 **YXZ**（内旋 `R = Ry · Rx · Rz`），单位为**度**。4�
 4. 大约稳定 **12** 帧才进入。单帧抖动不会把计数清零，也不会把已经能拍的快门打灰
 5. 分数 ≥ 该侧峰值的 **92%** 才进入；已经能拍则保持到 **86%**。亮度在范围内
 
-没有「请确认耳朵已经正了」这一步。峰值锁定前只扫转（不会按先验喊往回）。锁定后，过了 `bestYaw` 且分数掉了会说「往回一点，刚才那边更清楚」；往回走是保持，不是再转一点点。自动快门等 3 帧就绪后进入可取消的 **`autoshutterMs`** 倒数。**重新学习此侧**会再确认一次才清掉记住的峰值；学习本身是自动的。绝对角度 HUD 默认隐藏，只有打开 **调试：显示角度** 才出现。灰色快门会说明学习中 / 快到了 / 可以拍了——灰按钮近峰用 **NEAR_PEAK**（「快到了…」），不用 **HOLD_STILL**（「保持不动」）。`minSweepCoverageRatio` **不是** READY 硬门。
+没有「请确认耳朵已经正了」这一步。峰值锁定前只扫转（不会按先验喊往回）。锁定后，过了 `bestYaw` 且分数掉了会说「往回一点，刚才那边更清楚」；往回走是保持，不是再转一点点。自动快门等 3 帧就绪后进入可取消的 **`autoshutterMs`** 倒数。存下的照片是这短串里更清晰的一帧（`pickBurstBy: score`），并包含快门瞬间重新量过的那一帧。耳朵出画、脸丢失，或短暂跟丢刚恢复的那几帧，都不会改掉记住的峰值。**重新学习此侧**会再确认一次才清掉记住的峰值；学习本身是自动的。绝对角度 HUD 默认隐藏，只有打开 **调试：显示角度** 才出现。灰色快门会说明学习中 / 快到了 / 可以拍了——灰按钮近峰用 **NEAR_PEAK**（「快到了…」），不用 **HOLD_STILL**（「保持不动」）。`minSweepCoverageRatio` **不是** READY 硬门。
 
 ## 上限与短板
 
@@ -133,7 +133,7 @@ Euler 顺序为 **YXZ**（内旋 `R = Ry · Rx · Rz`），单位为**度**。4�
 | 就绪 vs 个人峰值 | `ready.bandDegAroundBest`、`ready.exitBandDeg`、`ready.scoreRatioOfBest`、`ready.scoreRatioExit` |
 | 更稳的峰值 / 少误灰 | `personalBest.confirmFrames`、`confirmYawDeg`、`rescoreFloorRatio`、`ready.stableDecay`、`ready.stableHoldFrames` |
 | 过冲 | `search.overshootPastBestDeg` |
-| 自动快门倒数 | `ready.autoshutterMs`、`ready.burstFrames` |
+| 自动快门倒数 / 连拍选帧 | `ready.autoshutterMs`、`ready.burstFrames`、`ready.pickBurstBy` |
 | 减少闪烁 | `promptUx.minDwellMs`、`crossFamilyDwellMs`、`slowDownPreemptMs`、`slowDownHoldMs`、`smoothing.oneEuro` |
 | 清晰度下限 | `score.sharp`、`score.struct` |
 | 文案 | `src/i18n/messages.ts` |
