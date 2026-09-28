@@ -2,20 +2,6 @@ import type { PoseConfig } from "../config";
 import { poseConfig } from "../config";
 import type { EarQuality } from "./types";
 
-function variance(values: Float64Array | number[]): number {
-  const n = values.length;
-  if (n === 0) return 0;
-  let sum = 0;
-  for (let i = 0; i < n; i++) sum += values[i];
-  const mean = sum / n;
-  let acc = 0;
-  for (let i = 0; i < n; i++) {
-    const d = values[i] - mean;
-    acc += d * d;
-  }
-  return acc / n;
-}
-
 function toGray(data: ArrayLike<number>, i: number): number {
   const r = data[i];
   const g = data[i + 1];
@@ -31,6 +17,45 @@ export type ImageDataLike = {
 
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
+}
+
+/**
+ * 1 at the ROI center, ~0.25 at the border. Hair and background texture
+ * usually sit on the edge of the ear crop; the pinna is expected nearer
+ * the middle. This is a soft weight, not a rejection.
+ */
+function spatialWeight(x: number, y: number, w: number, h: number): number {
+  const nx = ((x + 0.5) / w - 0.5) * 2;
+  const ny = ((y + 0.5) / h - 0.5) * 2;
+  const r = Math.min(1, Math.hypot(nx, ny));
+  return 1 - 0.75 * r;
+}
+
+/**
+ * Short blend so one noisy ROI sample does not dominate the personal peak.
+ * Burst selection keeps using the raw measurement. `alpha` 1 returns `next`.
+ */
+export function smoothEarQuality(
+  previous: EarQuality | null,
+  next: EarQuality,
+  alpha: number,
+): EarQuality {
+  if (!previous || !(alpha < 1)) return next;
+  const a = Math.min(1, Math.max(0, alpha));
+  const mix = (prev: number, sample: number) => a * sample + (1 - a) * prev;
+  const mixOpt = (prev: number | undefined, sample: number | undefined) => {
+    if (sample === undefined) return prev;
+    if (prev === undefined) return sample;
+    return mix(prev, sample);
+  };
+  return {
+    laplacian: mix(previous.laplacian, next.laplacian),
+    brightness: mix(previous.brightness, next.brightness),
+    edgeEnergy: mix(previous.edgeEnergy, next.edgeEnergy),
+    centerBrightness: mixOpt(previous.centerBrightness, next.centerBrightness),
+    centerSharpness: mixOpt(previous.centerSharpness, next.centerSharpness),
+    borderSharpness: mixOpt(previous.borderSharpness, next.borderSharpness),
+  };
 }
 
 export function unitInterval(
@@ -76,14 +101,25 @@ export function measureEarQuality(image: ImageDataLike): EarQuality {
   }
 
   const lap: number[] = [];
+  const lapW: number[] = [];
+  const centerLap: number[] = [];
+  const borderLap: number[] = [];
   let edgeSum = 0;
-  let edgeN = 0;
+  let edgeW = 0;
+  const cx0 = w * 0.25;
+  const cx1 = w * 0.75;
+  const cy0 = h * 0.25;
+  const cy1 = h * 0.75;
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
       const i = y * w + x;
+      const weight = spatialWeight(x, y, w, h);
       const L =
         gray[i - w] + gray[i + w] + gray[i - 1] + gray[i + 1] - 4 * gray[i];
       lap.push(L);
+      lapW.push(weight);
+      if (x >= cx0 && x < cx1 && y >= cy0 && y < cy1) centerLap.push(L);
+      else borderLap.push(L);
 
       const gx =
         -gray[i - w - 1] +
@@ -99,23 +135,62 @@ export function measureEarQuality(image: ImageDataLike): EarQuality {
         gray[i + w - 1] +
         2 * gray[i + w] +
         gray[i + w + 1];
-      edgeSum += Math.hypot(gx, gy);
-      edgeN += 1;
+      edgeSum += weight * Math.hypot(gx, gy);
+      edgeW += weight;
     }
   }
 
   return {
-    laplacian: variance(lap),
+    laplacian: weightedVariance(lap, lapW),
     brightness,
-    edgeEnergy: edgeN === 0 ? 0 : edgeSum / edgeN,
+    edgeEnergy: edgeW === 0 ? 0 : edgeSum / edgeW,
     centerBrightness,
+    centerSharpness: variance(centerLap),
+    borderSharpness: variance(borderLap),
   };
+}
+
+function variance(values: number[]): number {
+  const n = values.length;
+  if (n === 0) return 0;
+  let sum = 0;
+  for (let i = 0; i < n; i++) sum += values[i];
+  const mean = sum / n;
+  let acc = 0;
+  for (let i = 0; i < n; i++) {
+    const d = values[i] - mean;
+    acc += d * d;
+  }
+  return acc / n;
+}
+
+function weightedVariance(values: number[], weights: number[]): number {
+  const n = values.length;
+  if (n === 0) return 0;
+  let wSum = 0;
+  let meanAcc = 0;
+  for (let i = 0; i < n; i++) {
+    const w = weights[i] ?? 0;
+    wSum += w;
+    meanAcc += w * values[i];
+  }
+  if (wSum <= 0) return 0;
+  const mean = meanAcc / wSum;
+  let acc = 0;
+  for (let i = 0; i < n; i++) {
+    const w = weights[i] ?? 0;
+    const d = values[i] - mean;
+    acc += w * d * d;
+  }
+  return acc / wSum;
 }
 
 /**
  * 0–1 ear-frontal score: sharpness (Laplacian) + structure (edges) + a light
  * content prior (side-face yaw, preferred 40–80 band, dark-center penalty).
  * Preferred-band miss is a soft penalty, never a refusal of ~45°.
+ * Laplacian and edges are center-weighted in measureEarQuality so border
+ * hair/background counts less than structure in the middle of the crop.
  */
 export function frontalQualityScore(
   quality: EarQuality,
@@ -149,6 +224,18 @@ export function frontalQualityScore(
     }
   }
   if (
+    quality.centerSharpness !== undefined &&
+    quality.borderSharpness !== undefined &&
+    quality.borderSharpness >
+      Math.max(
+        s.sharp.laplacianMinRaw,
+        quality.centerSharpness * s.content.borderDominatesAbove,
+      )
+  ) {
+    // Border hair/background sharper than the pinna: soft penalty, not a refusal.
+    content = Math.max(0, content - s.content.borderSharpPenalty);
+  }
+  if (
     s.content.penalizeMeatusLikeDarkBlob &&
     quality.centerBrightness !== undefined &&
     quality.centerBrightness < s.content.meatusCenterBrightnessBelow &&
@@ -178,6 +265,14 @@ export function qualityAlongYawCurve(
     brightness: peak.brightness,
     edgeEnergy: peak.edgeEnergy * scale,
     centerBrightness: peak.centerBrightness,
+    centerSharpness:
+      peak.centerSharpness === undefined
+        ? undefined
+        : peak.centerSharpness * scale,
+    borderSharpness:
+      peak.borderSharpness === undefined
+        ? undefined
+        : peak.borderSharpness * scale,
   };
 }
 

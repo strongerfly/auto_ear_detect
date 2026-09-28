@@ -5,12 +5,17 @@ import {
   captureUiFor,
   evaluateGuidance,
   promptForDisplay,
+  stepStableFrames,
 } from "./guidance";
 import { dwellMsFor, dwellPrompt, INITIAL_DWELL } from "./dwell";
 import { effectiveTargets } from "./effective-targets";
 import {
+  createPeakMemory,
+  qualityNearPeak,
+  settlePersonalBest,
   updatePersonalBest,
   yawInSearchWindow,
+  type PeakMemory,
   type PeakSample,
 } from "./personal-best";
 import {
@@ -18,7 +23,7 @@ import {
   qualityAlongYawCurve,
 } from "./quality";
 import type { GuidanceInput } from "./guidance";
-import type { EarQuality } from "./types";
+import type { EarQuality, EulerDeg } from "./types";
 
 const sharp: EarQuality = {
   laplacian: 180,
@@ -619,6 +624,239 @@ describe("quality-driven personal best yaw", () => {
       12,
     );
     expect(ready.prompt).toBe("READY");
+  });
+
+  it("a brief wobble does not grey the shutter once capture was allowed", () => {
+    const best = peakAt(45);
+    const held = evaluateGuidance(
+      base({ yaw: 45 }),
+      poseConfig,
+      "rightEar",
+      best,
+      1,
+      { wasCapturable: true },
+    );
+    expect(held.allowCapture).toBe(true);
+    expect(held.prompt).toBe("READY");
+    const cold = evaluateGuidance(
+      base({ yaw: 45 }),
+      poseConfig,
+      "rightEar",
+      best,
+      1,
+    );
+    expect(cold.allowCapture).toBe(false);
+    const lost = evaluateGuidance(
+      base({ yaw: 45 }),
+      poseConfig,
+      "rightEar",
+      best,
+      0,
+      { wasCapturable: true },
+    );
+    expect(lost.allowCapture).toBe(false);
+    expect(lost.prompt).not.toBe("READY");
+  });
+
+  it("holds capture between the exit score ratio and the enter ratio", () => {
+    const best = peakAt(45);
+    const dipped: EarQuality = {
+      laplacian: 110,
+      brightness: 120,
+      edgeEnergy: 40,
+    };
+    const ratio = frontalQualityScore(dipped, 45) / (best.score || 1);
+    expect(ratio).toBeGreaterThan(poseConfig.ready.scoreRatioExit);
+    expect(ratio).toBeLessThan(poseConfig.ready.scoreRatioOfBest);
+    const blocked = evaluateGuidance(
+      base({ yaw: 45, quality: dipped }),
+      poseConfig,
+      "rightEar",
+      best,
+      12,
+    );
+    expect(blocked.allowCapture).toBe(false);
+    const held = evaluateGuidance(
+      base({ yaw: 45, quality: dipped }),
+      poseConfig,
+      "rightEar",
+      best,
+      12,
+      { wasCapturable: true },
+    );
+    expect(held.allowCapture).toBe(true);
+    expect(held.prompt).toBe("READY");
+  });
+
+  it("wobble hysteresis does not collapse SOFT_READY into READY", () => {
+    const best = peakAt(45);
+    const held = evaluateGuidance(
+      base({ yaw: 45 }),
+      poseConfig,
+      "rightEar",
+      best,
+      1,
+      { wasCapturable: true, softPeak: true },
+    );
+    expect(held.allowCapture).toBe(true);
+    expect(held.prompt).toBe("SOFT_READY");
+    expect(held.prompt).not.toBe("READY");
+  });
+});
+
+describe("stable-frame decay", () => {
+  it("one jitter subtracts credit instead of clearing the hold", () => {
+    const steady: EulerDeg = { yaw: 45, pitch: 0, roll: 0 };
+    const wobble: EulerDeg = { yaw: 50, pitch: 0, roll: 0 };
+    let count = 0;
+    let prev: EulerDeg | null = null;
+    for (let i = 0; i < 8; i++) {
+      count = stepStableFrames(count, steady, prev, poseConfig);
+      prev = steady;
+    }
+    expect(count).toBe(7);
+    count = stepStableFrames(count, wobble, prev, poseConfig);
+    expect(count).toBe(7 - poseConfig.ready.stableDecay);
+    expect(count).toBeGreaterThan(0);
+    count = stepStableFrames(count, steady, wobble, poseConfig);
+    expect(count).toBeGreaterThan(0);
+  });
+});
+
+describe("settled personal peak", () => {
+  function hold(
+    peak: PeakSample | null,
+    memory: PeakMemory,
+    yaw: number,
+    quality: EarQuality,
+    frames = poseConfig.personalBest.confirmFrames,
+  ) {
+    let nextPeak = peak;
+    let nextMemory = memory;
+    for (let i = 0; i < frames; i++) {
+      const settled = settlePersonalBest(nextPeak, nextMemory, {
+        yaw,
+        pitch: 0,
+        roll: 0,
+        quality,
+        side: "rightEar",
+        yawDelta: 0,
+      });
+      nextPeak = settled.peak;
+      nextMemory = settled.memory;
+    }
+    return { peak: nextPeak, memory: nextMemory };
+  }
+
+  it("ignores a one-frame spike that the instant updater would lock", () => {
+    const spike: EarQuality = {
+      laplacian: 200,
+      brightness: 120,
+      edgeEnergy: 48,
+    };
+    const instant = updatePersonalBest(null, {
+      yaw: 70,
+      pitch: 0,
+      roll: 0,
+      quality: spike,
+      side: "rightEar",
+      yawDelta: 0,
+    });
+    expect(instant?.yaw).toBe(70);
+    const settled = settlePersonalBest(null, createPeakMemory(), {
+      yaw: 70,
+      pitch: 0,
+      roll: 0,
+      quality: spike,
+      side: "rightEar",
+      yawDelta: 0,
+    });
+    expect(settled.peak).toBeNull();
+  });
+
+  it("locks the median of a steady cluster and ignores one sharp outlier", () => {
+    const steady: EarQuality = {
+      laplacian: 140,
+      brightness: 120,
+      edgeEnergy: 28,
+    };
+    const spike: EarQuality = {
+      laplacian: 400,
+      brightness: 120,
+      edgeEnergy: 80,
+    };
+    let peak: PeakSample | null = null;
+    let memory = createPeakMemory();
+    const yaws = [44, 45, 46, 45];
+    const qualities = [steady, steady, spike, steady];
+    for (let i = 0; i < yaws.length; i++) {
+      const settled = settlePersonalBest(peak, memory, {
+        yaw: yaws[i],
+        pitch: 0,
+        roll: 0,
+        quality: qualities[i],
+        side: "rightEar",
+        yawDelta: 1,
+      });
+      peak = settled.peak;
+      memory = settled.memory;
+    }
+    expect(peak).not.toBeNull();
+    expect(peak!.yaw).toBeGreaterThan(44);
+    expect(peak!.yaw).toBeLessThan(47);
+    expect(peak!.score).toBeLessThan(frontalQualityScore(spike, 45));
+    expect(peak!.score).toBeCloseTo(frontalQualityScore(steady, 45), 1);
+  });
+
+  it("lowers an inflated stored score so a good hold can capture again", () => {
+    const modest: EarQuality = {
+      laplacian: 110,
+      brightness: 120,
+      edgeEnergy: 40,
+    };
+    const inflated: PeakSample = { yaw: 45, score: 1 };
+    expect(qualityNearPeak(modest, inflated, 45)).toBe(false);
+    const settled = hold(inflated, createPeakMemory(), 45, modest);
+    expect(settled.peak).not.toBeNull();
+    expect(settled.peak!.yaw).toBe(45);
+    expect(settled.peak!.score).toBeLessThan(poseConfig.ready.scoreRatioOfBest);
+    expect(settled.peak!.score).toBeGreaterThan(
+      poseConfig.personalBest.rescoreFloorRatio,
+    );
+    expect(qualityNearPeak(modest, settled.peak, 45)).toBe(true);
+    const ready = evaluateGuidance(
+      base({ yaw: 45, quality: modest }),
+      poseConfig,
+      "rightEar",
+      settled.peak,
+      12,
+    );
+    expect(ready.allowCapture).toBe(true);
+    expect(ready.prompt).toBe("READY");
+  });
+
+  it("does not deflate a real peak down to a much worse cluster", () => {
+    const weak: EarQuality = {
+      laplacian: 100,
+      brightness: 120,
+      edgeEnergy: 20,
+    };
+    const inflated: PeakSample = { yaw: 45, score: 1 };
+    const settled = hold(inflated, createPeakMemory(), 45, weak);
+    expect(settled.peak?.score).toBe(1);
+    expect(qualityNearPeak(weak, settled.peak, 45)).toBe(false);
+  });
+
+  it("still prefers a steady smaller-abs tie over a far equally sharp angle", () => {
+    const even: EarQuality = {
+      laplacian: 160,
+      brightness: 120,
+      edgeEnergy: 40,
+    };
+    const far = hold(null, createPeakMemory(), 80, even);
+    expect(far.peak?.yaw).toBe(80);
+    const nearer = hold(far.peak, createPeakMemory(), 45, even);
+    expect(nearer.peak?.yaw).toBe(45);
   });
 });
 

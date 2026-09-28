@@ -48,7 +48,16 @@ export class OneEuroFilter {
       return this.xFilter.filter(x, 1);
     }
 
-    const dt = Math.max(t - this.lastTimeSec, 1e-6);
+    const dt = t - this.lastTimeSec;
+    // A stalled or jumped clock invents a huge velocity and yanks the pose.
+    // Reset onto the new sample instead of smoothing across the gap.
+    if (!(dt > 0) || dt > 0.5) {
+      this.lastTimeSec = t;
+      this.lastX = x;
+      this.dxFilter.reset();
+      this.xFilter.reset();
+      return this.xFilter.filter(x, 1);
+    }
     this.lastTimeSec = t;
     const dx = (x - this.lastX) / dt;
     this.lastX = x;

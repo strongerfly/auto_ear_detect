@@ -9,6 +9,13 @@ describe("OneEuroFilter", () => {
     expect(f.filter(10, 32)).toBe(10);
   });
 
+  it("resets across a timestamp gap instead of inventing a huge velocity", () => {
+    const f = new OneEuroFilter(1, 0.007, 1);
+    f.filter(0, 0);
+    f.filter(0, 16);
+    expect(f.filter(10, 2000)).toBe(10);
+  });
+
   it("smooths a step without exploding", () => {
     const f = new OneEuroFilter(1, 0.007, 1);
     f.filter(0, 0);
