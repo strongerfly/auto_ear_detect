@@ -10,6 +10,10 @@ export type EarQuality = {
   edgeEnergy: number;
   /** Mean luma of the ROI center (meatus-like dark-blob cue). */
   centerBrightness?: number;
+  /** Laplacian variance in the inner half of the crop. */
+  centerSharpness?: number;
+  /** Laplacian variance outside that inner half. */
+  borderSharpness?: number;
 };
 
 export type RoiBox = {

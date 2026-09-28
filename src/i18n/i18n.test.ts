@@ -275,6 +275,36 @@ describe("string lookup", () => {
     );
   });
 
+  it("learn, near-peak, ready, soft, stuck, and camera denial stay distinct", () => {
+    const keys = [
+      "learningNote",
+      "NEAR_PEAK",
+      "READY",
+      "SOFT_READY",
+      "softCaptureHint",
+      "STUCK_NO_PROGRESS",
+      "cameraDenied",
+    ] as const;
+    for (const locale of ["zh", "en"] as const) {
+      const lines = keys.map((key) => translate(locale, key));
+      expect(new Set(lines).size).toBe(lines.length);
+      expect(lines.join("\n")).not.toMatch(/70\s*[–-]\s*90/);
+      expect(lines.join("\n")).not.toMatch(/鸿蒙|HarmonyOS/);
+    }
+    expect(translate("zh", "cameraDenied")).toContain("打开摄像头");
+    expect(translate("zh", "cameraDenied")).toContain("浏览器设置");
+    expect(translate("en", "cameraDenied").toLowerCase()).toContain(
+      "open camera",
+    );
+    expect(translate("en", "cameraDenied").toLowerCase()).toContain(
+      "browser settings",
+    );
+    expect(translate("zh", "helpStuckBody")).toContain("打开摄像头");
+    expect(translate("en", "helpStuckBody").toLowerCase()).toContain(
+      "open camera",
+    );
+  });
+
   it("stuck copy offers retry, relearn, and hair/light — not a dead shutter", () => {
     expect(translate("zh", "STUCK_NO_PROGRESS")).toMatch(/头发|亮/);
     expect(translate("zh", "STUCK_NO_PROGRESS")).toMatch(/重新学习/);

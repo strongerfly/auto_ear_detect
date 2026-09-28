@@ -48,6 +48,34 @@ describe("ear ROI quality", () => {
     expect(frontalQualityScore(q, 45)).toBeGreaterThan(0.7);
   });
 
+  it("penalizes border-dominant texture without refusing a sharp center", () => {
+    const shared = {
+      laplacian: 180,
+      brightness: 120,
+      edgeEnergy: 40,
+    };
+    const center = frontalQualityScore(
+      { ...shared, centerSharpness: 400, borderSharpness: 40 },
+      45,
+    );
+    const border = frontalQualityScore(
+      { ...shared, centerSharpness: 40, borderSharpness: 400 },
+      45,
+    );
+    const even = frontalQualityScore(
+      { ...shared, centerSharpness: 400, borderSharpness: 420 },
+      45,
+    );
+    expect(center).toBeGreaterThan(border);
+    expect(center - border).toBeCloseTo(
+      poseConfig.score.content.borderSharpPenalty *
+        poseConfig.score.weights.content,
+      5,
+    );
+    expect(even).toBeCloseTo(center, 5);
+    expect(border).toBeGreaterThan(0.5);
+  });
+
   it("yaw curve peaks at the requested angle and drops at 80 when peak is 45", () => {
     const peak = { laplacian: 180, brightness: 120, edgeEnergy: 40 };
     const at45 = qualityAlongYawCurve(45, 45, peak);

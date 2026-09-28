@@ -38,6 +38,8 @@ export type GuidanceExtras = {
   earInFrame?: boolean;
   /** Weak/flat peak: capture allowed, copy distinct from READY. */
   softPeak?: boolean;
+  /** Previous frame already allowed capture. Loosens score/stability so one wobble does not grey the shutter. */
+  wasCapturable?: boolean;
 };
 
 export type CaptureUiState = "learning" | "hold" | "ready" | "soft";
@@ -189,16 +191,23 @@ export function pickPrompt(
     config,
     extras.wasReady === true,
   );
-  const stable = stableFrames >= config.ready.stableFrames;
+  const wasCapturable = extras.wasCapturable === true;
+  const stable =
+    stableFrames >= config.ready.stableFrames ||
+    (wasCapturable && stableFrames >= config.ready.stableHoldFrames);
   const peak =
     targets.locked && targets.bestYaw !== null && targets.peakScore !== null
       ? { yaw: targets.bestYaw, score: targets.peakScore }
       : null;
+  const scoreRatio = wasCapturable
+    ? Math.min(config.ready.scoreRatioOfBest, config.ready.scoreRatioExit)
+    : config.ready.scoreRatioOfBest;
   const nearPeakScore = qualityNearPeak(
     input.quality,
     peak,
     input.yaw,
     config,
+    scoreRatio,
   );
 
   const fail: Omit<GuidanceResult, "prompt"> = {
@@ -346,4 +355,20 @@ export function isAngleStable(
     Math.abs(current.pitch - previous.pitch) < config.ready.maxDeltaPitchDeg &&
     Math.abs(current.roll - previous.roll) < config.ready.maxDeltaRollDeg
   );
+}
+
+/**
+ * Stable frames accumulate while the pose holds. One jitter subtracts
+ * `stableDecay` instead of wiping the count, so a tracker wobble does not
+ * force another full hold before READY.
+ */
+export function stepStableFrames(
+  count: number,
+  current: EulerDeg,
+  previous: EulerDeg | null,
+  config: PoseConfig,
+): number {
+  if (!previous) return 0;
+  if (isAngleStable(current, previous, config)) return count + 1;
+  return Math.max(0, count - config.ready.stableDecay);
 }

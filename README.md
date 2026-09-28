@@ -103,15 +103,15 @@ Guidance copy refers to the user’s **physical** left/right, not screen-left.
 
 Head pose is for **direction**. Ready-to-shoot is **ear frontal quality** for this person, learned while they turn.
 
-Each side stores `bestYaw` at the highest ear-ROI score in a trackable side-turn window. Score = 0.45 Laplacian + 0.35 edge energy + 0.20 side-face content. Near-ties prefer the **smaller \|yaw\|**. A clear peak around ~45° can READY; sitting in a generic high-yaw band with no locked peak cannot.
+Each side stores `bestYaw` from the median score of a short steady cluster in a trackable side-turn window. One sharp frame does not lock it. Score = center-weighted 0.45 Laplacian + 0.35 edge energy + 0.20 side-face content. Near-ties prefer the **smaller \|yaw\|**. A clear peak around ~45° can READY; sitting in a generic high-yaw band with no locked peak cannot.
 
 READY when all of:
 
 1. Face present, size in `[minFaceHeightRatio, maxFaceHeightRatio]`
 2. A personal **bestYaw** is locked for this side
 3. Current yaw within **±5°** of that best (hysteresis leave **±8°**, `exitBandDeg`); pitch/roll inside ready limits
-4. Stable ~**12** frames
-5. Score ≥ **92%** of the personal peak, brightness in range
+4. Stable ~**12** frames to enter. One jitter does not wipe the count or grey a shutter that was already good
+5. Score ≥ **92%** of the personal peak to enter, and stays allowed down to **86%** once capture was already allowed; brightness in range
 
 No “confirm the ear is frontal” step. Until a peak is locked, prompts are **sweep only** (no prior-driven turn-back). After lock, going past `bestYaw` by `overshootPastBestDeg` with a score drop says ease back; returning toward best is HOLD, not MORE. Auto-shutter waits 3 ready frames, then a cancelable **`autoshutterMs`** countdown. **Relearn this side** asks for a second confirm before clearing the stored peak; learning itself is automatic. The absolute-angle HUD is hidden unless you turn on **Debug: show angles**. Grey capture explains learning vs near-peak vs ready — grey hold uses **NEAR_PEAK** (「快到了…」), never **HOLD_STILL**. `minSweepCoverageRatio` is **not** a hard READY gate.
 
@@ -130,7 +130,8 @@ Numeric thresholds: **`src/config/pose-config.json`**. User-visible strings: **`
 | Want… | Touch |
 |--------|--------|
 | Search / preferred band | `search.yawAbsMin` / `yawAbsMax` / `preferredAbs*` |
-| READY vs personal peak | `ready.bandDegAroundBest`, `ready.exitBandDeg`, `ready.scoreRatioOfBest` |
+| READY vs personal peak | `ready.bandDegAroundBest`, `ready.exitBandDeg`, `ready.scoreRatioOfBest`, `ready.scoreRatioExit` |
+| Steadier peak / less grey flicker | `personalBest.confirmFrames`, `confirmYawDeg`, `rescoreFloorRatio`, `ready.stableDecay`, `ready.stableHoldFrames` |
 | Overshoot past best | `search.overshootPastBestDeg` |
 | Auto-shutter countdown | `ready.autoshutterMs`, `ready.burstFrames` |
 | Less flicker | `promptUx.minDwellMs`, `crossFamilyDwellMs`, `slowDownPreemptMs`, `slowDownHoldMs`, `smoothing.oneEuro` |

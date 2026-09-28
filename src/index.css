@@ -170,7 +170,8 @@ h1 {
   box-shadow: 0 0 0 2px rgba(243, 193, 111, 0.28);
 }
 
-.stage.stuck {
+.stage.stuck,
+.stage.denied {
   border-color: var(--danger);
 }
 
@@ -309,7 +310,8 @@ h1 {
   color: #2a0c08;
 }
 
-.stuck-banner {
+.stuck-banner,
+.camera-denied-banner {
   position: absolute;
   top: 44px;
   left: 16px;

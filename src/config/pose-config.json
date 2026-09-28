@@ -43,7 +43,9 @@
       "penalizeMeatusLikeDarkBlob": true,
       "meatusPenalty": 0.25,
       "meatusCenterBrightnessBelow": 40,
-      "outsidePreferredSoftPenalty": 0.1
+      "outsidePreferredSoftPenalty": 0.1,
+      "borderSharpPenalty": 0.15,
+      "borderDominatesAbove": 2
     },
     "scoreMinAbsolute": 0.35,
     "softSuccessBelow": 0.55,
@@ -54,7 +56,10 @@
     "bandDegAroundBest": 5,
     "exitBandDeg": 8,
     "scoreRatioOfBest": 0.92,
+    "scoreRatioExit": 0.86,
     "stableFrames": 12,
+    "stableHoldFrames": 1,
+    "stableDecay": 2,
     "maxDeltaYawDeg": 3,
     "maxDeltaPitchDeg": 3,
     "maxDeltaRollDeg": 3,
@@ -71,7 +76,10 @@
     "persist": true,
     "alwaysRescore": true,
     "nextTimeNarrowSearchByDeg": 10,
-    "minScoreImprove": 0.02
+    "minScoreImprove": 0.02,
+    "confirmFrames": 4,
+    "confirmYawDeg": 6,
+    "rescoreFloorRatio": 0.62
   },
   "poseGuidance": {
     "rollCorrectAbove": 12,

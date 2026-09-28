@@ -15,14 +15,15 @@ import { useFaceLandmarker } from "../hooks/useFaceLandmarker";
 import { useWebcam } from "../hooks/useWebcam";
 import { useLocale } from "../i18n";
 import { countdownSeconds, stepAutoShutter } from "../lib/auto-shutter";
+import { cameraNotice } from "../lib/camera-access";
 import { dwellPrompt, INITIAL_DWELL, type DwellState } from "../lib/dwell";
 import { matrixToFiswgEuler } from "../lib/euler";
 import {
   captureHintKey,
   captureUiFor,
   evaluateGuidance,
-  isAngleStable,
   promptForDisplay,
+  stepStableFrames,
 } from "../lib/guidance";
 import {
   earInFrame,
@@ -33,10 +34,12 @@ import {
 } from "../lib/landmarks";
 import { EulerSmoother } from "../lib/one-euro";
 import {
+  createPeakMemory,
   loadPersonalBests,
   savePersonalBests,
-  updatePersonalBest,
+  settlePersonalBest,
   yawInSearchWindow,
+  type PeakMemory,
   type PersonalBestMap,
 } from "../lib/personal-best";
 import {
@@ -146,6 +149,8 @@ export function EarCaptureApp() {
   const sweepRef = useRef(EMPTY_SWEEP);
   const capturedThisSideRef = useRef(false);
   const wasReadyRef = useRef(false);
+  const wasCapturableRef = useRef(false);
+  const peakMemoryRef = useRef<PeakMemory>(createPeakMemory());
 
   sideRef.current = side;
   bestsRef.current = bests;
@@ -175,6 +180,8 @@ export function EarCaptureApp() {
     sweepRef.current = EMPTY_SWEEP;
     capturedThisSideRef.current = false;
     wasReadyRef.current = false;
+    wasCapturableRef.current = false;
+    peakMemoryRef.current = createPeakMemory();
     setRelearnArmed(false);
     setLive({
       ...INITIAL_LIVE,
@@ -210,15 +217,26 @@ export function EarCaptureApp() {
     };
   }, []);
 
+  const notice = cameraNotice({
+    sim: sim.enabled,
+    camError,
+    camReady,
+  });
+  const cameraDenied = notice === "denied";
   const personalBest = side ? bests[side] : null;
   const captureUi = captureUiFor(
     personalBest !== null,
     live.allowCapture,
     live.softReady,
   );
-  const captureHint = side ? t(captureHintKey(captureUi)) : t("PICK_SIDE");
-  const promptText =
-    live.captured && !live.stuck
+  const captureHint = cameraDenied
+    ? t("cameraDenied")
+    : side
+      ? t(captureHintKey(captureUi))
+      : t("PICK_SIDE");
+  const promptText = cameraDenied
+    ? t("cameraDenied")
+    : live.captured && !live.stuck
       ? captureFeedback
         ? t(captureResultKey(captureFeedback))
         : t("captureNearPeak")
@@ -440,12 +458,13 @@ export function EarCaptureApp() {
       if (!hasFace || !angles) {
         stableFrames.current = 0;
         lastAngles.current = null;
-      } else if (
-        isAngleStable(angles, lastAngles.current, poseConfig)
-      ) {
-        stableFrames.current += 1;
       } else {
-        stableFrames.current = 0;
+        stableFrames.current = stepStableFrames(
+          stableFrames.current,
+          angles,
+          lastAngles.current,
+          poseConfig,
+        );
       }
       const yawDeltaSigned =
         lastAngles.current && angles
@@ -463,14 +482,20 @@ export function EarCaptureApp() {
           );
         }
         const prevPeak = bestsRef.current[currentSide];
-        const nextPeak = updatePersonalBest(prevPeak, {
-          yaw: angles.yaw,
-          pitch: angles.pitch,
-          roll: angles.roll,
-          quality,
-          side: currentSide,
-          yawDelta,
-        });
+        const settled = settlePersonalBest(
+          prevPeak,
+          peakMemoryRef.current,
+          {
+            yaw: angles.yaw,
+            pitch: angles.pitch,
+            roll: angles.roll,
+            quality,
+            side: currentSide,
+            yawDelta,
+          },
+        );
+        peakMemoryRef.current = settled.memory;
+        const nextPeak = settled.peak;
         if (nextPeak !== prevPeak) {
           const nextMap = { ...bestsRef.current, [currentSide]: nextPeak };
           bestsRef.current = nextMap;
@@ -504,9 +529,11 @@ export function EarCaptureApp() {
             sweepRef.current,
             bestsRef.current[currentSide]?.score ?? null,
           ),
+          wasCapturable: wasCapturableRef.current,
         },
       );
       wasReadyRef.current = guidance.poseReady;
+      wasCapturableRef.current = guidance.allowCapture;
 
       const inIntro = now < introUntilRef.current;
       progressRef.current = stepProgress(progressRef.current, {
@@ -613,6 +640,8 @@ export function EarCaptureApp() {
     const current = sideRef.current;
     if (!isSideChosen(current)) return;
     const now = performance.now();
+    wasCapturableRef.current = false;
+    stableFrames.current = 0;
     progressRef.current = retryProgress(progressRef.current, now);
     introUntilRef.current = sideIntroUntil(now);
     const intro = introPromptFor(current);
@@ -655,14 +684,12 @@ export function EarCaptureApp() {
   };
 
   const stageHint = useMemo(() => {
-    if (sim.enabled) return t("simMode");
-    if (camError === "NotAllowedError" || camError === "NotFoundError") {
-      return t("cameraDenied");
-    }
-    if (camError) return t("cameraError", { error: camError });
-    if (!camReady) return t("cameraOff");
+    if (notice === "sim") return t("simMode");
+    if (notice === "denied") return t("cameraDenied");
+    if (notice === "error") return t("cameraError", { error: camError ?? "" });
+    if (notice === "off") return t("cameraOff");
     return t("previewHint");
-  }, [camError, camReady, sim.enabled, t]);
+  }, [camError, notice, t]);
 
   return (
     <div className="app" data-locale={locale} data-side={side ?? "none"}>
@@ -703,7 +730,7 @@ export function EarCaptureApp() {
       <p className="status">{status}</p>
 
       <section
-        className={`stage${live.softReady ? " soft" : live.allowCapture ? " ready" : ""}${live.stuck ? " stuck" : ""}`}
+        className={`stage${cameraDenied ? " denied" : live.softReady ? " soft" : live.allowCapture ? " ready" : ""}${live.stuck ? " stuck" : ""}`}
       >
         <video
           ref={videoRef}
@@ -734,15 +761,27 @@ export function EarCaptureApp() {
         ) : (
           <div
             className="prompt"
-            data-ready={live.allowCapture && !live.softReady}
-            data-soft={live.softReady}
+            data-ready={live.allowCapture && !live.softReady && !cameraDenied}
+            data-soft={live.softReady && !cameraDenied}
             data-stuck={live.stuck}
+            data-camera-denied={cameraDenied}
             data-captured={live.captured && !live.stuck}
           >
             {promptText}
           </div>
         )}
-        {live.stuck ? (
+        {cameraDenied ? (
+          <div className="camera-denied-banner" role="status">
+            <button
+              type="button"
+              className="stuck-retry"
+              onClick={() => void start()}
+            >
+              {t("openCamera")}
+            </button>
+          </div>
+        ) : null}
+        {live.stuck && !cameraDenied ? (
           <div className="stuck-banner" role="status">
             <button type="button" className="stuck-retry" onClick={retryStuck}>
               {t("stuckRetry")}
@@ -800,7 +839,15 @@ export function EarCaptureApp() {
         <button type="button" className="ghost" onClick={stop}>
           {t("closeCamera")}
         </button>
-        {live.stuck ? (
+        {cameraDenied ? (
+          <button
+            type="button"
+            className="capture"
+            onClick={() => void start()}
+          >
+            {t("openCamera")}
+          </button>
+        ) : live.stuck ? (
           <button type="button" className="capture" onClick={retryStuck}>
             {t("stuckRetry")}
           </button>
