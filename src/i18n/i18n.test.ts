@@ -284,6 +284,7 @@ describe("string lookup", () => {
       "softCaptureHint",
       "STUCK_NO_PROGRESS",
       "cameraDenied",
+      "cameraMissing",
     ] as const;
     for (const locale of ["zh", "en"] as const) {
       const lines = keys.map((key) => translate(locale, key));
@@ -302,6 +303,14 @@ describe("string lookup", () => {
     expect(translate("zh", "helpStuckBody")).toContain("打开摄像头");
     expect(translate("en", "helpStuckBody").toLowerCase()).toContain(
       "open camera",
+    );
+    expect(translate("zh", "cameraMissing")).toContain("打开摄像头");
+    expect(translate("zh", "cameraMissing")).not.toContain("浏览器设置");
+    expect(translate("en", "cameraMissing").toLowerCase()).toContain(
+      "open camera",
+    );
+    expect(translate("en", "cameraMissing").toLowerCase()).not.toContain(
+      "browser settings",
     );
   });
 

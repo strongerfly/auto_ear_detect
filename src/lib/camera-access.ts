@@ -1,9 +1,15 @@
-export type CameraNotice = "sim" | "denied" | "error" | "off" | "preview";
+export type CameraNotice =
+  | "sim"
+  | "denied"
+  | "missing"
+  | "error"
+  | "off"
+  | "preview";
 
 /**
- * Web/Android camera failure. `denied` is recoverable (retry getUserMedia
- * after the user allows the site). A missing camera is `error`, not the
- * permission sentence. This is not a HarmonyOS settings path.
+ * Web/Android camera failure. `denied` and `missing` are both recoverable
+ * (tap Open camera again) but they use different sentences. This is not a
+ * HarmonyOS settings path.
  */
 export function cameraNotice(input: {
   sim: boolean;
@@ -12,6 +18,7 @@ export function cameraNotice(input: {
 }): CameraNotice {
   if (input.sim) return "sim";
   if (input.camError === "NotAllowedError") return "denied";
+  if (input.camError === "NotFoundError") return "missing";
   if (input.camError) return "error";
   if (!input.camReady) return "off";
   return "preview";

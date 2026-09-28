@@ -222,20 +222,26 @@ export function EarCaptureApp() {
     camError,
     camReady,
   });
-  const cameraDenied = notice === "denied";
+  const cameraDenied = notice === "denied" || notice === "missing";
+  const cameraBlockText =
+    notice === "denied"
+      ? t("cameraDenied")
+      : notice === "missing"
+        ? t("cameraMissing")
+        : null;
   const personalBest = side ? bests[side] : null;
   const captureUi = captureUiFor(
     personalBest !== null,
     live.allowCapture,
     live.softReady,
   );
-  const captureHint = cameraDenied
-    ? t("cameraDenied")
+  const captureHint = cameraBlockText
+    ? cameraBlockText
     : side
       ? t(captureHintKey(captureUi))
       : t("PICK_SIDE");
-  const promptText = cameraDenied
-    ? t("cameraDenied")
+  const promptText = cameraBlockText
+    ? cameraBlockText
     : live.captured && !live.stuck
       ? captureFeedback
         ? t(captureResultKey(captureFeedback))
@@ -686,6 +692,7 @@ export function EarCaptureApp() {
   const stageHint = useMemo(() => {
     if (notice === "sim") return t("simMode");
     if (notice === "denied") return t("cameraDenied");
+    if (notice === "missing") return t("cameraMissing");
     if (notice === "error") return t("cameraError", { error: camError ?? "" });
     if (notice === "off") return t("cameraOff");
     return t("previewHint");

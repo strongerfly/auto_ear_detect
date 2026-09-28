@@ -16,7 +16,7 @@ describe("camera notice", () => {
         camError: "NotFoundError",
         camReady: false,
       }),
-    ).toBe("error");
+    ).toBe("missing");
     expect(
       cameraNotice({ sim: false, camError: null, camReady: false }),
     ).toBe("off");
