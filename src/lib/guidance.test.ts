@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, createElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { EarCaptureApp } from "../components/EarCaptureApp";
 import { poseConfig } from "../config";
 import {
   captureHintKey,
@@ -20,10 +23,54 @@ import {
 } from "./personal-best";
 import {
   frontalQualityScore,
+  measureEarQuality,
   qualityAlongYawCurve,
 } from "./quality";
 import type { GuidanceInput } from "./guidance";
 import type { EarQuality, EulerDeg } from "./types";
+
+const cameraFixture = vi.hoisted(() => ({
+  visible: true,
+  faceCount: 1,
+  heightRatio: 0.4,
+  presence: 1,
+  tracking: 1,
+  quality: { laplacian: 180, brightness: 120, edgeEnergy: 40 },
+  videoRef: { current: null as HTMLVideoElement | null },
+}));
+
+vi.mock("../hooks/useWebcam", () => ({
+  useWebcam: () => ({
+    videoRef: cameraFixture.videoRef, ready: true, error: null,
+    start: () => Promise.resolve(), stop: () => {},
+  }),
+}));
+vi.mock("../hooks/useFaceLandmarker", () => {
+  const landmarker = {
+    detectForVideo: () => ({
+      faceLandmarks: Array.from({ length: cameraFixture.faceCount }, () => [{}]),
+      facialTransformationMatrixes: [{ data: [] }],
+    }),
+  };
+  return { useFaceLandmarker: () => ({ landmarker, error: null, loading: false }) };
+});
+vi.mock("./euler", () => ({
+  matrixToFiswgEuler: () => ({ yaw: 45, pitch: 0, roll: 0 }),
+}));
+vi.mock("./landmarks", () => ({
+  earRoiLayout: () => ({ roi: { x: 10, y: 10, w: 100, h: 150 }, visibleRatio: 1 }),
+  earInFrame: () => cameraFixture.visible,
+  faceHeightRatio: () => cameraFixture.heightRatio,
+  meanPresence: () => cameraFixture.presence,
+  meanVisibility: () => cameraFixture.tracking,
+}));
+vi.mock("./quality", async (importOriginal) => ({
+  ...await importOriginal<typeof import("./quality")>(),
+  measureEarQuality: vi.fn(() => cameraFixture.quality),
+}));
+vi.mock("../i18n", () => ({
+  useLocale: () => ({ locale: "zh", setLocale: () => {}, t: (key: string) => key }),
+}));
 
 const sharp: EarQuality = {
   laplacian: 180,
@@ -724,6 +771,98 @@ describe("stable-frame decay", () => {
 });
 
 describe("settled personal peak", () => {
+  function sampleAt(timestampMs: number, over = {}) {
+    return {
+      yaw: 45,
+      pitch: 0,
+      roll: 0,
+      quality: sharp,
+      side: "rightEar" as const,
+      yawDelta: 0,
+      timestampMs,
+      ...over,
+    };
+  }
+
+  function partialCluster() {
+    let memory = createPeakMemory();
+    for (const timestamp of [0, 100, 200]) {
+      memory = settlePersonalBest(null, memory, sampleAt(timestamp)).memory;
+    }
+    return memory;
+  }
+
+  it.each([
+    ["wrong side", { yaw: -45 }],
+    ["invalid pitch", { pitch: 20 }],
+    ["invalid roll", { roll: 20 }],
+    ["fast turn", { yawDelta: 30 }],
+    ["low score", { quality: { ...sharp, laplacian: 0, edgeEnergy: 0 } }],
+    ["blurred but edged ROI", { quality: { ...sharp, laplacian: 0 } }],
+    ["sharp but structureless ROI", { quality: { ...sharp, edgeEnergy: 0 } }],
+    ["dark frame", { quality: { ...sharp, brightness: 20 } }],
+    ["overexposed frame", { quality: { ...sharp, brightness: 240 } }],
+    ["non-finite angle", { yaw: Number.NaN }],
+    ["non-finite quality", { quality: { ...sharp, laplacian: Number.NaN } }],
+    ["non-finite turn delta", { yawDelta: Number.POSITIVE_INFINITY }],
+    ["non-finite timestamp", { timestampMs: Number.NaN }],
+  ])("starts a new confirmation after a %s", (_name, over) => {
+    const confirmed = peakAt(60);
+    const rejected = settlePersonalBest(confirmed, partialCluster(), sampleAt(300, over));
+    expect(rejected.peak).toBe(confirmed);
+    expect(rejected.memory.recent).toHaveLength(0);
+    const resumed = settlePersonalBest(null, rejected.memory, sampleAt(400));
+    expect(resumed.peak).toBeNull();
+    expect(resumed.memory.recent).toHaveLength(1);
+  });
+
+  it("does not combine samples across a camera pause", () => {
+    const resumed = settlePersonalBest(null, partialCluster(), sampleAt(2_000));
+    expect(resumed.peak).toBeNull();
+    expect(resumed.memory.recent).toHaveLength(1);
+  });
+
+  it("does not count a duplicate timestamp as a new frame", () => {
+    const memory = partialCluster();
+    const duplicate = settlePersonalBest(null, memory, sampleAt(200));
+    expect(duplicate.peak).toBeNull();
+    expect(duplicate.memory.recent).toHaveLength(3);
+    expect(settlePersonalBest(null, duplicate.memory, sampleAt(300)).peak?.yaw).toBe(45);
+  });
+
+  it("starts a new cluster when the sample clock goes backwards", () => {
+    const restarted = settlePersonalBest(null, partialCluster(), sampleAt(50));
+    expect(restarted.peak).toBeNull();
+    expect(restarted.memory.recent).toHaveLength(1);
+  });
+
+  it("bounds the total confirmation duration even with regular samples", () => {
+    let memory = createPeakMemory();
+    let peak: PeakSample | null = null;
+    const config = {
+      ...poseConfig,
+      personalBest: { ...poseConfig.personalBest, confirmFrames: 6 },
+    };
+    for (const timestamp of [0, 400, 800, 1_200, 1_600, 2_000]) {
+      const settled = settlePersonalBest(peak, memory, sampleAt(timestamp), config);
+      peak = settled.peak;
+      memory = settled.memory;
+    }
+    expect(peak).toBeNull();
+    expect(memory.recent).toHaveLength(4);
+  });
+
+  it("still confirms a continuous 45-degree hold at a low sample rate", () => {
+    let memory = createPeakMemory();
+    let peak: PeakSample | null = null;
+    for (const timestamp of [0, 400, 800, 1_200]) {
+      const settled = settlePersonalBest(peak, memory, sampleAt(timestamp));
+      peak = settled.peak;
+      memory = settled.memory;
+    }
+    expect(peak?.yaw).toBe(45);
+  });
+
   function hold(
     peak: PeakSample | null,
     memory: PeakMemory,
@@ -857,6 +996,148 @@ describe("settled personal peak", () => {
     expect(far.peak?.yaw).toBe(80);
     const nearer = hold(far.peak, createPeakMemory(), 45, even);
     expect(nearer.peak?.yaw).toBe(45);
+  });
+});
+
+describe("camera peak learning and capture", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+  let nextFrame: FrameRequestCallback | null;
+  let now: number;
+  let videoTime: number;
+  let cameraReady: number;
+
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem("auto-ear-detect:chosen-side:v1", "rightEar");
+    Object.assign(cameraFixture, {
+      visible: true, faceCount: 1, heightRatio: 0.4, presence: 1, tracking: 1,
+      quality: { ...sharp },
+    });
+    vi.mocked(measureEarQuality).mockClear();
+    now = 0;
+    videoTime = 0;
+    cameraReady = 2;
+    nextFrame = null;
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      nextFrame = callback;
+      return 1;
+    });
+    vi.stubGlobal("cancelAnimationFrame", () => { nextFrame = null; });
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    const context = new Proxy({
+      getImageData: () => ({ data: new Uint8ClampedArray(4), width: 1, height: 1 }),
+      measureText: () => ({ width: 100 }),
+    }, {
+      get: (target, key) => key in target
+        ? Reflect.get(target, key)
+        : () => {},
+    }) as unknown as CanvasRenderingContext2D;
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context);
+    vi.spyOn(HTMLCanvasElement.prototype, "toDataURL")
+      .mockReturnValue("data:image/png;base64,dGVzdA==");
+    container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+    act(() => root.render(createElement(EarCaptureApp)));
+    const video = cameraFixture.videoRef.current!;
+    Object.defineProperties(video, {
+      readyState: { configurable: true, get: () => cameraReady },
+      videoWidth: { configurable: true, value: 640 },
+      videoHeight: { configurable: true, value: 480 },
+      currentTime: { configurable: true, get: () => videoTime },
+    });
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+    localStorage.clear();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  function frame(gapMs = 33) {
+    now += gapMs;
+    videoTime += gapMs / 1_000;
+    const callback = nextFrame;
+    expect(callback).not.toBeNull();
+    act(() => callback!(now));
+  }
+
+  function captureButton() {
+    return container.querySelector<HTMLButtonElement>("button.capture")!;
+  }
+
+  function reachReady() {
+    for (let i = 0; i < 20 && captureButton().disabled; i++) frame();
+    expect(captureButton().disabled).toBe(false);
+  }
+
+  it.each([
+    ["clipped ROI", () => { cameraFixture.visible = false; }],
+    ["multiple returned faces", () => { cameraFixture.faceCount = 2; }],
+    ["too distant face", () => { cameraFixture.heightRatio = 0.1; }],
+    ["too close face", () => { cameraFixture.heightRatio = 0.9; }],
+    ["low presence", () => { cameraFixture.presence = 0.1; }],
+    ["low tracking", () => { cameraFixture.tracking = 0.1; }],
+    ["dark ROI", () => { cameraFixture.quality.brightness = 20; }],
+    ["blurred ROI with clear edges", () => { cameraFixture.quality.laplacian = 0; }],
+    ["sharp ROI without structure", () => { cameraFixture.quality.edgeEnergy = 0; }],
+  ])("does not learn across a %s", (_name, interrupt) => {
+    for (let i = 0; i < 3; i++) frame();
+    interrupt();
+    frame();
+    Object.assign(cameraFixture, {
+      visible: true, faceCount: 1, heightRatio: 0.4, presence: 1, tracking: 1,
+      quality: { ...sharp },
+    });
+    frame();
+    expect(container.querySelector(".calib-note")?.textContent).toBe("learningNote");
+    expect(localStorage.getItem("auto-ear-detect:best-yaw:v1")).toBeNull();
+    for (let i = 0; i < 3; i++) frame();
+    const peaks = JSON.parse(localStorage.getItem("auto-ear-detect:best-yaw:v1")!);
+    expect(peaks.rightEar.yaw).toBe(45);
+  });
+
+  it("restarts confirmation after a gap in actual camera frames", () => {
+    for (let i = 0; i < 3; i++) frame();
+    frame(2_000);
+    expect(container.querySelector(".calib-note")?.textContent).toBe("learningNote");
+    expect(localStorage.getItem("auto-ear-detect:best-yaw:v1")).toBeNull();
+  });
+
+  it("does not manufacture a simulator image when the real camera stops", () => {
+    reachReady();
+    cameraReady = 0;
+    act(() => captureButton().click());
+    expect(container.querySelector(".preview img")).toBeNull();
+    expect(HTMLCanvasElement.prototype.toDataURL).not.toHaveBeenCalled();
+  });
+
+  it("rejects a stale ready candidate before the next camera callback", () => {
+    reachReady();
+    now += 2_000;
+    act(() => captureButton().click());
+    expect(container.querySelector(".preview img")).toBeNull();
+    expect(HTMLCanvasElement.prototype.toDataURL).not.toHaveBeenCalled();
+  });
+
+  it("auto-captures the validated burst without remeasuring with stale pose", () => {
+    let frames = 0;
+    while (!container.querySelector(".preview img") && frames < 150) {
+      frame();
+      frames++;
+    }
+    expect(container.querySelector(".preview img")).not.toBeNull();
+    expect(measureEarQuality).toHaveBeenCalledTimes(frames);
+    const retake = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "retake")!;
+    act(() => retake.click());
+    expect(container.querySelector(".preview img")).toBeNull();
+    expect(captureButton().disabled).toBe(true);
+    reachReady();
   });
 });
 

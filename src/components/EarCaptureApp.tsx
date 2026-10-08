@@ -45,7 +45,9 @@ import {
 } from "../lib/peak-hygiene";
 import {
   createPeakMemory,
+  isBestYawSampleEligible,
   loadPersonalBests,
+  MAX_PEAK_SAMPLE_GAP_MS,
   savePersonalBests,
   settlePersonalBest,
   yawInSearchWindow,
@@ -186,6 +188,7 @@ export function EarCaptureApp() {
   const lastAngles = useRef<EulerDeg | null>(null);
   const stableFrames = useRef(0);
   const lastVideoTime = useRef(-1);
+  const lastSampleTime = useRef<number | null>(null);
   const smootherRef = useRef<EulerSmoother | null>(null);
   const readyBurst = useRef(0);
   const bootNow =
@@ -224,6 +227,7 @@ export function EarCaptureApp() {
     readyBurst.current = 0;
     stableFrames.current = 0;
     lastAngles.current = null;
+    lastSampleTime.current = null;
     smootherRef.current?.reset();
     progressRef.current = createProgress(now);
     introUntilRef.current = sideIntroUntil(now);
@@ -348,7 +352,7 @@ export function EarCaptureApp() {
 
   const captureStill = useCallback(() => {
     const chosen = sideRef.current;
-    if (!isSideChosen(chosen)) return;
+    if (!isSideChosen(chosen) || capturedThisSideRef.current) return;
     const video = videoRef.current;
     const canvas = document.createElement("canvas");
     const snap = liveRef.current;
@@ -358,49 +362,43 @@ export function EarCaptureApp() {
         ? frontalQualityScore(snap.quality, snap.yaw)
         : (bestsRef.current[chosen]?.score ?? 0);
     let savedCanvas: HTMLCanvasElement | null = null;
-    if (!simRef.current.enabled && video && video.readyState >= 2 && video.videoWidth > 0) {
-      let quality = snap.quality;
-      const scratch = sampleRef.current;
-      if (snap.roi && scratch) {
-        const remeasured = readRoiQuality(video, snap.roi, scratch);
-        if (remeasured) quality = remeasured;
-      }
-      const yaw = snap.yaw;
-      const score =
-        quality && yaw != null ? frontalQualityScore(quality, yaw) : capturedScore;
-      rememberVideoBurst(video, score, yaw, quality);
+    if (!simRef.current.enabled) {
+      // Each candidate already has matching pixels, pose and measured quality.
+      // Re-scoring here with liveRef would mix the new video frame with old pose.
       const best = pickBurstCandidate(
         burstRef.current,
         poseConfig.ready.pickBurstBy,
       );
-      if (best) {
-        savedCanvas = best.payload.canvas;
-        capturedScore = best.score;
+      const sampleTime = lastSampleTime.current;
+      if (!video || video.readyState < 2 || video.videoWidth <= 0 || !best ||
+          sampleTime === null || performance.now() - sampleTime > MAX_PEAK_SAMPLE_GAP_MS) {
+        burstRef.current = [];
+        readyBurst.current = 0;
+        shutterLatch.current = false;
+        countdownStartedAt.current = null;
+        setLive((prev) => ({ ...prev, allowCapture: false, shutterCountdownMs: null }));
+        return;
       }
+      savedCanvas = best.payload.canvas;
+      capturedScore = best.score;
     }
-    if (simRef.current.enabled || !video || video.readyState < 2 || !savedCanvas) {
+    if (simRef.current.enabled) {
       canvas.width = 960;
       canvas.height = 540;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      if (simRef.current.enabled || !video || video.readyState < 2) {
-        drawSimStill(
-          ctx,
-          canvas.width,
-          canvas.height,
-          chosen,
-          simRef.current,
-          snap.yaw,
-          snap.pitch,
-          snap.roll,
-          label(chosen === "rightEar" ? "simStillRight" : "simStillLeft"),
-          label(chosen === "rightEar" ? "roiRight" : "roiLeft"),
-        );
-      } else {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0);
-      }
+      drawSimStill(
+        ctx,
+        canvas.width,
+        canvas.height,
+        chosen,
+        simRef.current,
+        snap.yaw,
+        snap.pitch,
+        snap.roll,
+        label(chosen === "rightEar" ? "simStillRight" : "simStillLeft"),
+        label(chosen === "rightEar" ? "roiRight" : "roiLeft"),
+      );
     }
     const url = (savedCanvas ?? canvas).toDataURL("image/png");
     burstRef.current = [];
@@ -418,7 +416,7 @@ export function EarCaptureApp() {
         snap.softReady,
       ),
     );
-  }, [rememberVideoBurst, videoRef]);
+  }, [videoRef]);
 
   const captureStillRef = useRef(captureStill);
   captureStillRef.current = captureStill;
@@ -560,6 +558,26 @@ export function EarCaptureApp() {
         return;
       }
 
+      if (didSample) {
+        const previousTime = lastSampleTime.current;
+        if (previousTime !== null &&
+            (now <= previousTime || now - previousTime > MAX_PEAK_SAMPLE_GAP_MS)) {
+          // An interrupted camera stream is not an uninterrupted stable hold.
+          stableFrames.current = 0;
+          lastAngles.current = null;
+          smootherRef.current?.reset();
+          peakMemoryRef.current = createPeakMemory();
+          smoothedQualityRef.current = null;
+          wasReadyRef.current = false;
+          wasCapturableRef.current = false;
+          readyBurst.current = 0;
+          countdownStartedAt.current = null;
+          burstRef.current = [];
+          lastBurstVideoTimeRef.current = -1;
+        }
+        lastSampleTime.current = now;
+      }
+
       const angles: EulerDeg | null =
         yaw === null || pitch === null || roll === null
           ? null
@@ -596,28 +614,43 @@ export function EarCaptureApp() {
         );
         hygieneRef.current = hygiene.state;
         allowPeakUpdate = hygiene.allowPeakUpdate;
-        if (!hasFace) {
-          smoothedQualityRef.current = null;
-          peakMemoryRef.current = createPeakMemory();
-        }
       }
 
+      const peakSample = angles && quality ? {
+        ...angles,
+        quality,
+        side: currentSide,
+        yawDelta,
+        timestampMs: now,
+      } : null;
+      // A sharp crop must also belong to one well-tracked, correctly sized face.
+      const canLearnPeak = allowPeakUpdate && hasFace && faceCount === 1 &&
+        presence >= poseConfig.faceGates.minFacePresence &&
+        tracking >= poseConfig.faceGates.minTrackingConfidence &&
+        heightRatio >= poseConfig.faceGates.minFaceHeightRatio &&
+        heightRatio <= poseConfig.faceGates.maxFaceHeightRatio &&
+        peakSample !== null && isBestYawSampleEligible(peakSample);
+      if (!canLearnPeak) {
+        smoothedQualityRef.current = null;
+        peakMemoryRef.current = createPeakMemory();
+      }
       const peakQuality =
-        quality && allowPeakUpdate
+        peakSample && canLearnPeak
           ? smoothEarQuality(
               smoothedQualityRef.current,
-              quality,
+              peakSample.quality,
               poseConfig.score.smoothAlpha,
             )
           : null;
       if (peakQuality) smoothedQualityRef.current = peakQuality;
 
-      if (hasFace && angles && peakQuality) {
-        if (yawInSearchWindow(angles.yaw, currentSide)) {
+      if (peakSample && peakQuality) {
+        const { yaw } = peakSample;
+        if (yawInSearchWindow(yaw, currentSide)) {
           sweepRef.current = noteSweepSample(
             sweepRef.current,
-            angles.yaw,
-            frontalQualityScore(peakQuality, angles.yaw),
+            yaw,
+            frontalQualityScore(peakQuality, yaw),
           );
         }
         const prevPeak = bestsRef.current[currentSide];
@@ -625,12 +658,8 @@ export function EarCaptureApp() {
           prevPeak,
           peakMemoryRef.current,
           {
-            yaw: angles.yaw,
-            pitch: angles.pitch,
-            roll: angles.roll,
+            ...peakSample,
             quality: peakQuality,
-            side: currentSide,
-            yawDelta,
           },
         );
         peakMemoryRef.current = settled.memory;
@@ -817,10 +846,8 @@ export function EarCaptureApp() {
   const retake = () => {
     setLastCapture(null);
     setCaptureFeedback(null);
-    capturedThisSideRef.current = false;
-    shutterLatch.current = false;
-    cancelReadyEpisode.current = false;
-    countdownStartedAt.current = null;
+    const current = sideRef.current;
+    if (isSideChosen(current)) resetSideSession(current);
   };
 
   const cancelAutoShutter = () => {
