@@ -18,8 +18,8 @@ import {
 
 export type GuidanceInput = {
   hasFace: boolean;
-  facePresence: number;
-  trackingConfidence: number;
+  facePresence: number | null;
+  trackingConfidence: number | null;
   faceHeightRatio: number;
   yaw: number;
   pitch: number;
@@ -28,18 +28,114 @@ export type GuidanceInput = {
   faceCount?: number;
 };
 
+export type ConditionEvidence = {
+  state: "PASS" | "FAIL" | "UNKNOWN";
+  reliability: "observed" | "limited" | "unavailable";
+  required: boolean;
+  source: string;
+};
+
+export type CaptureConditions = {
+  eligible: boolean;
+  reason: PromptKey | null;
+  sampledAtMs: number | null;
+  evidence: Record<string, ConditionEvidence>;
+};
+
+/** Model thresholds are not calibrated probabilities. Missing scores stay unknown. */
+export function evaluateCaptureConditions(
+  input: GuidanceInput,
+  config: PoseConfig,
+  context: {
+    source?: "camera" | "simulator";
+    earInFrame?: boolean;
+    roiShortEdgePx?: number;
+    timestampMs?: number;
+  } = {},
+): CaptureConditions {
+  const evidence: Record<string, ConditionEvidence> = {};
+  let reason: PromptKey | null = null;
+  const note = (key: string, state: ConditionEvidence["state"],
+    source: string, required: boolean, prompt: PromptKey,
+    reliability: ConditionEvidence["reliability"] = "observed") => {
+    evidence[key] = { state, source, required, reliability };
+    if (required && state !== "PASS" && reason === null) reason = prompt;
+  };
+  const validUnit = (value: number | null) => value !== null &&
+    Number.isFinite(value) && value >= 0 && value <= 1;
+  const finitePose = [input.yaw, input.pitch, input.roll].every(Number.isFinite);
+  note("tracking", input.hasFace && finitePose && (input.faceCount ?? 1) > 0
+    ? "PASS" : "UNKNOWN", "face-landmarks-and-matrix", true, "NO_FACE", "limited");
+  note("singleFace", (input.faceCount ?? 1) > 1 ? "FAIL" : "PASS",
+    "face-landmarker", true, "MULTI_FACE");
+  for (const [key, value, threshold] of [
+    ["presence", input.facePresence, config.faceGates.minFacePresence],
+    ["confidence", input.trackingConfidence, config.faceGates.minTrackingConfidence],
+  ] as const) {
+    // Confidence is supplementary when the JS model does not report it.
+    // A reported low/invalid score is still a capture blocker.
+    const state = value === null ? "UNKNOWN" :
+      validUnit(value) && value >= threshold ? "PASS" : "FAIL";
+    note(key, state, "landmark-score", value !== null, "NO_FACE",
+      value === null ? "unavailable" : "limited");
+  }
+  if (context.source === "camera") {
+    note("inFrame", context.earInFrame === undefined ? "UNKNOWN" :
+      context.earInFrame ? "PASS" : "FAIL", "projected-roi", true,
+      context.earInFrame === undefined ? "CHECK_EAR" : "EAR_OUT_OF_FRAME", "limited");
+    const px = context.roiShortEdgePx;
+    note("pixels", px === undefined || !Number.isFinite(px) ? "UNKNOWN" :
+      px >= config.captureConditions.minRoiShortEdgePx ? "PASS" : "FAIL",
+      "native-video-roi", true, px === undefined || !Number.isFinite(px) ? "CHECK_EAR" : "TOO_FAR");
+  } else {
+    note("inFrame", context.earInFrame === false ? "FAIL" : "PASS",
+      context.source === "simulator" ? "synthetic" : "caller", true,
+      "EAR_OUT_OF_FRAME", "limited");
+  }
+  const ratio = input.faceHeightRatio;
+  const distanceState = !Number.isFinite(ratio) || ratio <= 0 ? "UNKNOWN" :
+    ratio < config.faceGates.minFaceHeightRatio || ratio > config.faceGates.maxFaceHeightRatio
+      ? "FAIL" : "PASS";
+  // Face height is a coarse guide. Native ROI pixels and clipping control
+  // camera eligibility; a profile-induced size estimate cannot veto them.
+  note("distance", distanceState, "face-height-proxy", context.source !== "camera",
+    ratio > config.faceGates.maxFaceHeightRatio ? "TOO_CLOSE" : "TOO_FAR", "limited");
+  const q = input.quality;
+  const known = q !== null && [q.laplacian, q.edgeEnergy, q.brightness]
+    .every(Number.isFinite) && q.laplacian >= 0 && q.edgeEnergy >= 0 &&
+    q.brightness >= 0 && q.brightness <= 255;
+  note("exposure", !known ? "UNKNOWN" :
+    q!.brightness < config.ready.brightnessMin || q!.brightness > config.ready.brightnessMax
+      ? "FAIL" : "PASS", "roi-luma", true,
+    q && q.brightness > config.ready.brightnessMax ? "TOO_BRIGHT" :
+      q && q.brightness < config.ready.brightnessMin ? "TOO_DARK" : "CHECK_EAR");
+  const center = q?.centerSharpness;
+  const centerOk = center === undefined || Number.isFinite(center) &&
+    center >= config.score.sharp.laplacianMinRaw * config.captureConditions.minCenterSharpnessRatio;
+  note("sharpness", !known ? "UNKNOWN" :
+    q!.laplacian >= config.score.sharp.laplacianMinRaw && centerOk ? "PASS" : "FAIL",
+    "roi-optical-quality", true, "BLURRY_EAR", "limited");
+  note("structure", !known ? "UNKNOWN" :
+    q!.edgeEnergy >= config.score.struct.minEdgeEnergy ? "PASS" : "FAIL",
+    "roi-edges", true, "CHECK_EAR", "limited");
+  // This project has no semantic ear/occlusion model. Optical evidence must
+  // never be presented as a calibrated probability of an unobstructed ear.
+  note("earVisibility", "UNKNOWN", "ear-model-unavailable", false, "CHECK_EAR", "unavailable");
+  return { eligible: reason === null, reason,
+    sampledAtMs: context.timestampMs ?? null, evidence };
+}
+
 export type GuidanceExtras = {
-  yawDelta?: number;
-  /** Signed per-frame Δyaw; used to detect returning toward bestYaw. */
-  yawDeltaSigned?: number;
   /** Previous frame was inside the READY band (enter ±5° / leave ±8°). */
   wasReady?: boolean;
   /** False when the ear ROI is mostly clipped. Undefined = unknown (simulator). */
   earInFrame?: boolean;
   /** Weak/flat peak: capture allowed, copy distinct from READY. */
   softPeak?: boolean;
-  /** Previous frame already allowed capture. Loosens score/stability so one wobble does not grey the shutter. */
+  /** Previous frame allowed capture. Score hysteresis never relaxes stable time. */
   wasCapturable?: boolean;
+  conditions?: CaptureConditions;
+  angularVelocityDegPerSec?: EulerDeg | null;
 };
 
 export type CaptureUiState = "learning" | "hold" | "ready" | "soft";
@@ -75,6 +171,8 @@ export type GuidanceResult = {
   qualityKind: QualityKind;
   targets: EffectiveTargets;
   allowCapture: boolean;
+  /** Current qualification, before the continuous stable-time requirement. */
+  captureEligible: boolean;
 };
 
 function sameSignAsBest(yaw: number, bestYaw: number): boolean {
@@ -120,7 +218,7 @@ function returningTowardBest(
 function pickYawPrompt(
   yaw: number,
   t: EffectiveTargets,
-  yawDelta: number,
+  yawSpeed: number,
   yawDeltaSigned: number,
   config: PoseConfig,
   quality: EarQuality | null,
@@ -134,7 +232,7 @@ function pickYawPrompt(
   }
 
   if (!t.locked) {
-    if (yawDelta >= config.search.slowYawDeltaDeg) return "SLOW_DOWN";
+    if (yawSpeed >= config.captureConditions.slowYawSpeedDegPerSec) return "SLOW_DOWN";
     return t.side === "rightEar" ? "SWEEP_RIGHT_EAR" : "SWEEP_LEFT_EAR";
   }
 
@@ -146,7 +244,7 @@ function pickYawPrompt(
   if (abs <= holdBand) return null;
 
   if (
-    yawDelta >= config.search.slowYawDeltaDeg &&
+    yawSpeed >= config.captureConditions.slowYawSpeedDegPerSec &&
     abs > holdBand
   ) {
     return "SLOW_DOWN";
@@ -178,7 +276,7 @@ export function pickPrompt(
   input: GuidanceInput,
   config: PoseConfig,
   targets: EffectiveTargets,
-  stableFrames: number,
+  stableMs: number,
   extras: GuidanceExtras = {},
 ): GuidanceResult {
   const qualityKind = classifyEarQuality(input.quality, config);
@@ -192,9 +290,10 @@ export function pickPrompt(
     extras.wasReady === true,
   );
   const wasCapturable = extras.wasCapturable === true;
-  const stable =
-    stableFrames >= config.ready.stableFrames ||
-    (wasCapturable && stableFrames >= config.ready.stableHoldFrames);
+  const stable = Number.isFinite(stableMs) && stableMs >= config.captureConditions.stableMs;
+  const conditions = extras.conditions ?? evaluateCaptureConditions(input, config, {
+    earInFrame: extras.earInFrame,
+  });
   const peak =
     targets.locked && targets.bestYaw !== null && targets.peakScore !== null
       ? { yaw: targets.bestYaw, score: targets.peakScore }
@@ -216,22 +315,21 @@ export function pickPrompt(
     qualityKind,
     targets,
     allowCapture: false,
+    captureEligible: false,
   };
 
   if (
-    !input.hasFace ||
-    input.facePresence < config.faceGates.minFacePresence ||
-    input.trackingConfidence < config.faceGates.minTrackingConfidence
+    conditions.reason === "NO_FACE"
   ) {
     return { ...fail, prompt: "NO_FACE", poseNear: false, poseReady: false };
   }
-  if ((input.faceCount ?? 1) > 1) {
+  if (conditions.reason === "MULTI_FACE") {
     return { ...fail, prompt: "MULTI_FACE", poseNear: false, poseReady: false };
   }
-  if (input.faceHeightRatio < config.faceGates.minFaceHeightRatio) {
+  if (conditions.reason === "TOO_FAR") {
     return { ...fail, prompt: "TOO_FAR", poseNear: false, poseReady: false };
   }
-  if (input.faceHeightRatio > config.faceGates.maxFaceHeightRatio) {
+  if (conditions.reason === "TOO_CLOSE") {
     return { ...fail, prompt: "TOO_CLOSE", poseNear: false, poseReady: false };
   }
 
@@ -256,8 +354,8 @@ export function pickPrompt(
   const yawHint = pickYawPrompt(
     input.yaw,
     targets,
-    extras.yawDelta ?? 0,
-    extras.yawDeltaSigned ?? 0,
+    Math.abs(extras.angularVelocityDegPerSec?.yaw ?? 0),
+    extras.angularVelocityDegPerSec?.yaw ?? 0,
     config,
     input.quality,
     extras.wasReady === true,
@@ -277,41 +375,38 @@ export function pickPrompt(
     };
   }
 
+  // Once the ear should be observable, a cold-start quality failure must
+  // explain the blocked learning instead of endlessly asking for a sweep.
+  if (expectEar && !conditions.eligible && (!targets.locked || yawHint === null)) {
+    const movingBlur = conditions.reason === "BLURRY_EAR" &&
+      extras.angularVelocityDegPerSec !== null &&
+      extras.angularVelocityDegPerSec !== undefined &&
+      Object.values(extras.angularVelocityDegPerSec).some((v) =>
+        Math.abs(v) > config.captureConditions.maxAngularSpeedDegPerSec);
+    return { ...fail, prompt: movingBlur ? "SLOW_DOWN" : conditions.reason ?? "CHECK_EAR" };
+  }
+
   if (yawHint) {
     return { ...fail, prompt: yawHint, poseNear: false, poseReady: false };
   }
 
-  if (qualityKind === "hair") {
-    return { ...fail, prompt: "CLEAR_HAIR" };
-  }
-  if (qualityKind === "light") {
-    if (
-      input.quality &&
-      input.quality.brightness > config.ready.brightnessMax
-    ) {
-      return { ...fail, prompt: "TOO_BRIGHT" };
-    }
-    if (
-      input.quality &&
-      input.quality.brightness < config.ready.brightnessMin
-    ) {
-      return { ...fail, prompt: "TOO_DARK" };
-    }
-    return { ...fail, prompt: "BAD_LIGHT" };
+  if (!conditions.eligible) {
+    return { ...fail, prompt: conditions.reason ?? "CHECK_EAR" };
   }
 
-  const allowCapture =
-    poseReady && stable && qualityKind === "ok" && nearPeakScore;
+  const captureEligible = poseReady && qualityKind === "ok" && nearPeakScore;
+  const allowCapture = captureEligible && stable;
   if (allowCapture) {
     return {
       ...fail,
       prompt: extras.softPeak ? "SOFT_READY" : "READY",
       allowCapture: true,
+      captureEligible: true,
     };
   }
   // Near a locked peak but not stable / not quite the peak score.
   // Never claim "hold still" while capture is still blocked.
-  return { ...fail, prompt: "NEAR_PEAK" };
+  return { ...fail, prompt: "NEAR_PEAK", captureEligible };
 }
 
 /**
@@ -337,38 +432,9 @@ export function evaluateGuidance(
   config: PoseConfig,
   side: EffectiveTargets["side"],
   personalBest: PeakSample | null,
-  stableFrames: number,
+  stableMs: number,
   extras: GuidanceExtras = {},
 ): GuidanceResult {
   const targets = effectiveTargets(side, personalBest, config);
-  return pickPrompt(input, config, targets, stableFrames, extras);
-}
-
-export function isAngleStable(
-  current: EulerDeg,
-  previous: EulerDeg | null,
-  config: PoseConfig,
-): boolean {
-  if (!previous) return false;
-  return (
-    Math.abs(current.yaw - previous.yaw) < config.ready.maxDeltaYawDeg &&
-    Math.abs(current.pitch - previous.pitch) < config.ready.maxDeltaPitchDeg &&
-    Math.abs(current.roll - previous.roll) < config.ready.maxDeltaRollDeg
-  );
-}
-
-/**
- * Stable frames accumulate while the pose holds. One jitter subtracts
- * `stableDecay` instead of wiping the count, so a tracker wobble does not
- * force another full hold before READY.
- */
-export function stepStableFrames(
-  count: number,
-  current: EulerDeg,
-  previous: EulerDeg | null,
-  config: PoseConfig,
-): number {
-  if (!previous) return 0;
-  if (isAngleStable(current, previous, config)) return count + 1;
-  return Math.max(0, count - config.ready.stableDecay);
+  return pickPrompt(input, config, targets, stableMs, extras);
 }

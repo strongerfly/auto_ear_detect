@@ -107,13 +107,23 @@ Each side stores `bestYaw` from the median score of a short steady cluster in a 
 
 READY when all of:
 
-1. Face present, size in `[minFaceHeightRatio, maxFaceHeightRatio]`
+1. One trackable face and a finite pose. Reported confidence must pass its threshold; absent confidence stays unknown, not an invented score of 1. Two face results are requested so the multi-person gate can actually trigger.
 2. A personal **bestYaw** is locked for this side
 3. Current yaw within **±5°** of that best (hysteresis leave **±8°**, `exitBandDeg`); pitch/roll inside ready limits
-4. Stable ~**12** frames to enter. One jitter does not wipe the count or grey a shutter that was already good
+4. Continuously qualified for **700 ms**, with raw-pose angular speed at most **8 degrees/second** on each axis and an angle range at most **2.5 degrees** across the hold window. Velocity uses a 200 ms window with baselines of at least 150 ms, rather than per-frame differences.
 5. Score ≥ **92%** of the personal peak to enter, and stays allowed down to **86%** once capture was already allowed; brightness in range
 
-No “confirm the ear is frontal” step. Until a peak is locked, prompts are **sweep only** (no prior-driven turn-back). After lock, going past `bestYaw` by `overshootPastBestDeg` with a score drop says ease back; returning toward best is HOLD, not MORE. Auto-shutter waits 3 ready frames, then a cancelable **`autoshutterMs`** countdown. The saved photo is the sharpest of that short burst (`pickBurstBy: score`), including a fresh measurement at the shutter. **Relearn this side** asks for a second confirm before clearing the stored peak; learning itself is automatic. A clipped ear, a lost face, or the frames right after a brief tracking blip do not move the remembered peak. The absolute-angle HUD is hidden unless you turn on **Debug: show angles**. Grey capture explains learning vs near-peak vs ready — grey hold uses **NEAR_PEAK** (「快到了…」), never **HOLD_STILL**. `minSweepCoverageRatio` is **not** a hard READY gate.
+6. The original video ROI has a short edge of at least **48 pixels**, at least **90%** of the projected ROI is inside the frame, optical sharpness/structure passes its individual floor, and exposure is usable. When available, center sharpness also has a floor so a sharp border cannot alone qualify a blurred center. Face height is only a coarse camera-distance guide; it cannot overrule sufficient original ROI pixels and valid framing. The simulator still uses its synthetic face-size control.
+
+Until a peak is locked, prompts are **sweep only** (no prior-driven turn-back). After lock, going past `bestYaw` by `overshootPastBestDeg` with a score drop says ease back; returning toward best is HOLD, not MORE. Fast-turn guidance and peak learning use measured yaw speed, starting at **45 degrees/second**, rather than a per-frame delta. Peak confirmation still requires four distinct qualified observations; its learning latency can vary with sampling rate.
+
+Auto-shutter starts its cancelable **`autoshutterMs`** countdown upon READY. Three frames remain the recent selection-buffer depth, not an extra frame-rate-dependent delay before countdown. The saved photo is a fresh, qualified candidate from that buffer (`pickBurstBy: score`). Detection, ROI quality and candidate pixels use the same frozen source canvas; the shutter does not remeasure new pixels with old pose. Every candidate carries its own timestamp and ear side. A gap over **500 ms**, quality failure, camera stop, hidden page, retry or source/side switch clears the hold and candidates. Quality recovery must earn the full stable duration again; previous READY never shortcuts it. A frozen video cannot accumulate time through repeated animation callbacks. Simulator peaks are kept separately and never saved over camera peaks.
+
+**Relearn this side** asks for a second confirm before clearing the stored peak; learning itself is automatic. A clipped ROI, a lost face, or the frames right after a brief tracking blip do not move the remembered peak. The absolute-angle HUD is hidden unless you turn on **Debug: show angles**. Grey capture explains learning vs near-peak vs ready — grey hold uses **NEAR_PEAK** (「快到了…」), never **HOLD_STILL**. `minSweepCoverageRatio` is **not** a hard READY gate.
+
+Each capture condition records **PASS / FAIL / UNKNOWN**, its source, whether it is required, and a qualitative reliability level. Missing essential optical or framing evidence blocks capture. Missing model confidence remains supplementary when finite face geometry is available. Ear visibility is explicitly **UNKNOWN** because this build has no semantic ear/occlusion model. Scores rank already-qualified frames; a high score cannot compensate for clipping, blur or bad exposure. Blur and insufficient detail have separate prompts and are not asserted to be hair obstruction.
+
+The timing, speed, ROI-pixel and center-sharpness defaults are **calibration starting points**, not measured algorithm accuracy. Validate by camera, resolution, lighting and user-held-out examples; measure unusable-photo acceptance, usable-photo rejection and capture time. Model confidence and correlated optical scores are not independent votes or calibrated probabilities. Tests replay holds and motion at **5 / 10 / 15 / 30 / 60 FPS**; READY quantization may differ by one sampling interval.
 
 ## Ceiling and shortfalls（上限与短板）
 
@@ -131,7 +141,9 @@ Numeric thresholds: **`src/config/pose-config.json`**. User-visible strings: **`
 |--------|--------|
 | Search / preferred band | `search.yawAbsMin` / `yawAbsMax` / `preferredAbs*` |
 | READY vs personal peak | `ready.bandDegAroundBest`, `ready.exitBandDeg`, `ready.scoreRatioOfBest`, `ready.scoreRatioExit` |
-| Steadier peak / less grey flicker | `personalBest.confirmFrames`, `confirmYawDeg`, `rescoreFloorRatio`, `ready.stableDecay`, `ready.stableHoldFrames` |
+| Peak confirmation | `personalBest.confirmFrames`, `confirmYawDeg`, `rescoreFloorRatio` |
+| Stable time / angular motion | `captureConditions.stableMs`, `maxAngularSpeedDegPerSec`, `maxAngularRangeDeg`, `velocityWindowMs`, `minVelocityWindowMs`, `maxGapMs` |
+| Native ROI pixels / framing / center clarity | `captureConditions.minRoiShortEdgePx`, `minRoiVisibleRatio`, `minCenterSharpnessRatio` |
 | Overshoot past best | `search.overshootPastBestDeg` |
 | Auto-shutter countdown / burst pick | `ready.autoshutterMs`, `ready.burstFrames`, `ready.pickBurstBy` |
 | Less flicker | `promptUx.minDwellMs`, `crossFamilyDwellMs`, `slowDownPreemptMs`, `slowDownHoldMs`, `smoothing.oneEuro` |

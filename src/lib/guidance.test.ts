@@ -7,8 +7,8 @@ import {
   captureHintKey,
   captureUiFor,
   evaluateGuidance,
+  evaluateCaptureConditions,
   promptForDisplay,
-  stepStableFrames,
 } from "./guidance";
 import { dwellMsFor, dwellPrompt, INITIAL_DWELL } from "./dwell";
 import { effectiveTargets } from "./effective-targets";
@@ -27,7 +27,7 @@ import {
   qualityAlongYawCurve,
 } from "./quality";
 import type { GuidanceInput } from "./guidance";
-import type { EarQuality, EulerDeg } from "./types";
+import type { EarQuality } from "./types";
 
 const cameraFixture = vi.hoisted(() => ({
   visible: true,
@@ -35,6 +35,9 @@ const cameraFixture = vi.hoisted(() => ({
   heightRatio: 0.4,
   presence: 1,
   tracking: 1,
+  reportScores: true,
+  roiShortEdge: 100,
+  yaw: 45,
   quality: { laplacian: 180, brightness: 120, edgeEnergy: 40 },
   videoRef: { current: null as HTMLVideoElement | null },
 }));
@@ -48,17 +51,19 @@ vi.mock("../hooks/useWebcam", () => ({
 vi.mock("../hooks/useFaceLandmarker", () => {
   const landmarker = {
     detectForVideo: () => ({
-      faceLandmarks: Array.from({ length: cameraFixture.faceCount }, () => [{}]),
-      facialTransformationMatrixes: [{ data: [] }],
+      faceLandmarks: Array.from({ length: cameraFixture.faceCount }, () =>
+        [cameraFixture.reportScores ? { presence: cameraFixture.presence,
+          visibility: cameraFixture.tracking } : {}]),
+      facialTransformationMatrixes: [{ data: Array.from({ length: 16 }, (_, i) => i % 5 === 0 ? 1 : 0) }],
     }),
   };
   return { useFaceLandmarker: () => ({ landmarker, error: null, loading: false }) };
 });
 vi.mock("./euler", () => ({
-  matrixToFiswgEuler: () => ({ yaw: 45, pitch: 0, roll: 0 }),
+  matrixToFiswgEuler: () => ({ yaw: cameraFixture.yaw, pitch: 0, roll: 0 }),
 }));
 vi.mock("./landmarks", () => ({
-  earRoiLayout: () => ({ roi: { x: 10, y: 10, w: 100, h: 150 }, visibleRatio: 1 }),
+  earRoiLayout: () => ({ roi: { x: 10, y: 10, w: cameraFixture.roiShortEdge, h: 150 }, visibleRatio: 1 }),
   earInFrame: () => cameraFixture.visible,
   faceHeightRatio: () => cameraFixture.heightRatio,
   meanPresence: () => cameraFixture.presence,
@@ -96,7 +101,84 @@ function base(over: Partial<GuidanceInput> = {}): GuidanceInput {
   };
 }
 
+describe("capture evidence and algorithm disagreement", () => {
+  const camera = { source: "camera" as const, earInFrame: true,
+    roiShortEdgePx: 100, timestampMs: 250 };
+
+  it("keeps unavailable model scores unknown without inventing confidence", () => {
+    const result = evaluateCaptureConditions(base({ facePresence: null,
+      trackingConfidence: null }), poseConfig, camera);
+    expect(result.eligible).toBe(true);
+    expect(result.evidence.presence.state).toBe("UNKNOWN");
+    expect(result.evidence.confidence.reliability).toBe("unavailable");
+    expect(result.evidence.earVisibility.state).toBe("UNKNOWN");
+    expect(result.sampledAtMs).toBe(250);
+  });
+
+  it.each([0, NaN, Infinity, -0.2, 1.2])("rejects reported invalid/low confidence %s", (score) => {
+    expect(evaluateCaptureConditions(base({ facePresence: score }), poseConfig, camera)
+      .eligible).toBe(false);
+  });
+
+  it.each([0.1, 0.9])("does not let coarse face size %s overrule usable native pixels", (ratio) => {
+    const result = evaluateCaptureConditions(base({ faceHeightRatio: ratio }), poseConfig, camera);
+    expect(result.eligible).toBe(true);
+    expect(result.evidence.distance.state).toBe("FAIL");
+    expect(result.evidence.distance.required).toBe(false);
+  });
+
+  it.each([
+    [{ ...camera, earInFrame: false }, "EAR_OUT_OF_FRAME"],
+    [{ ...camera, roiShortEdgePx: 20 }, "TOO_FAR"],
+    [{ ...camera, roiShortEdgePx: undefined }, "CHECK_EAR"],
+    [{ ...camera, earInFrame: undefined }, "CHECK_EAR"],
+  ])("optical score cannot compensate for missing geometry", (context, reason) => {
+    const result = evaluateCaptureConditions(base(), poseConfig, context);
+    expect(result.eligible).toBe(false);
+    expect(result.reason).toBe(reason);
+  });
+
+  it("rejects a sharp border when the ROI center is blurred", () => {
+    const result = evaluateCaptureConditions(base({ quality: { ...sharp,
+      centerSharpness: 0, borderSharpness: 900 } }), poseConfig, camera);
+    expect(result.reason).toBe("BLURRY_EAR");
+  });
+
+  it.each([
+    [{ ...sharp, edgeEnergy: 0 }, "CHECK_EAR"],
+    [{ ...sharp, brightness: 20 }, "TOO_DARK"],
+    [{ ...sharp, brightness: 250 }, "TOO_BRIGHT"],
+    [{ ...sharp, laplacian: NaN }, "CHECK_EAR"],
+    [null, "CHECK_EAR"],
+  ])("quality failures retain their actual reason", (quality, reason) => {
+    const result = evaluateCaptureConditions(base({ quality }), poseConfig, camera);
+    expect(result.eligible).toBe(false);
+    expect(result.reason).toBe(reason);
+  });
+
+  it("never uses an invalid pose as a valid tracking result", () => {
+    expect(evaluateCaptureConditions(base({ yaw: NaN }), poseConfig, camera).eligible).toBe(false);
+  });
+});
+
 describe("pickPrompt priority", () => {
+  it.each([
+    [{ ...sharp, brightness: 20 }, "TOO_DARK"],
+    [{ ...sharp, brightness: 250 }, "TOO_BRIGHT"],
+    [{ ...sharp, laplacian: 0 }, "BLURRY_EAR"],
+    [{ ...sharp, edgeEnergy: 0 }, "CHECK_EAR"],
+  ])("explains a cold-start quality failure in the observable ear range", (quality, prompt) => {
+    const result = evaluateGuidance(base({ yaw: 45, quality }), poseConfig, "rightEar", null, 0);
+    expect(result.prompt).toBe(prompt);
+    expect(result.captureEligible).toBe(false);
+  });
+
+  it("asks to slow down when blur has current motion evidence", () => {
+    const result = evaluateGuidance(base({ yaw: 45, quality: { ...sharp, laplacian: 0 } }),
+      poseConfig, "rightEar", peakAt(45), 0,
+      { angularVelocityDegPerSec: { yaw: 10, pitch: 0, roll: 0 } });
+    expect(result.prompt).toBe("SLOW_DOWN");
+  });
   it("NO_FACE when missing", () => {
     const r = evaluateGuidance(base({ hasFace: false }), poseConfig, "rightEar", null, 0);
     expect(r.prompt).toBe("NO_FACE");
@@ -183,7 +265,7 @@ describe("pickPrompt priority", () => {
     ).toBe("WRONG_SIDE");
   });
 
-  it("SLOW_DOWN when yaw jumps while still hunting", () => {
+  it("SLOW_DOWN uses degrees per second while hunting", () => {
     expect(
       evaluateGuidance(
         base({ yaw: 20 }),
@@ -191,12 +273,12 @@ describe("pickPrompt priority", () => {
         "rightEar",
         null,
         0,
-        { yawDelta: 20 },
+        { angularVelocityDegPerSec: { yaw: 60, pitch: 0, roll: 0 } },
       ).prompt,
     ).toBe("SLOW_DOWN");
   });
 
-  it("CLEAR_HAIR then TOO_DARK only once near the personal peak", () => {
+  it("distinguishes blur from lighting without claiming hair obstruction", () => {
     const best = peakAt(60);
     expect(
       evaluateGuidance(
@@ -206,7 +288,7 @@ describe("pickPrompt priority", () => {
         best,
         0,
       ).prompt,
-    ).toBe("CLEAR_HAIR");
+    ).toBe("BLURRY_EAR");
     expect(
       evaluateGuidance(
         base({ quality: { laplacian: 180, brightness: 20, edgeEnergy: 40 } }),
@@ -234,18 +316,18 @@ describe("pickPrompt priority", () => {
     ).toBe("SWEEP_RIGHT_EAR");
   });
 
-  it("NEAR_PEAK until stable frames, then READY near a locked peak", () => {
+  it("NEAR_PEAK until stable time, then READY near a locked peak", () => {
     const best = peakAt(60);
     const hold = evaluateGuidance(base(), poseConfig, "rightEar", best, 3);
     expect(hold.prompt).toBe("NEAR_PEAK");
     expect(hold.allowCapture).toBe(false);
-    const ready = evaluateGuidance(base(), poseConfig, "rightEar", best, 12);
+    const ready = evaluateGuidance(base(), poseConfig, "rightEar", best, poseConfig.captureConditions.stableMs);
     expect(ready.prompt).toBe("READY");
     expect(ready.allowCapture).toBe(true);
   });
 
   it("cold start (unlocked) cannot capture and only sweeps", () => {
-    const r = evaluateGuidance(base({ yaw: 0 }), poseConfig, "rightEar", null, 12);
+    const r = evaluateGuidance(base({ yaw: 0 }), poseConfig, "rightEar", null, poseConfig.captureConditions.stableMs);
     expect(r.allowCapture).toBe(false);
     expect(r.targets.locked).toBe(false);
     expect(r.prompt).toBe("SWEEP_RIGHT_EAR");
@@ -378,7 +460,7 @@ describe("quality-driven personal best yaw", () => {
       poseConfig,
       "rightEar",
       best,
-      12,
+      poseConfig.captureConditions.stableMs,
     );
     expect(r.targets.locked).toBe(true);
     expect(r.targets.bestYaw).toBe(45);
@@ -389,7 +471,7 @@ describe("quality-driven personal best yaw", () => {
   });
 
   it("yaw at 80 with ok quality is not READY without a locked personal best", () => {
-    const r = evaluateGuidance(base({ yaw: 80 }), poseConfig, "rightEar", null, 12);
+    const r = evaluateGuidance(base({ yaw: 80 }), poseConfig, "rightEar", null, poseConfig.captureConditions.stableMs);
     expect(r.allowCapture).toBe(false);
     expect(r.prompt).not.toBe("READY");
     expect(r.poseReady).toBe(false);
@@ -402,7 +484,7 @@ describe("quality-driven personal best yaw", () => {
       poseConfig,
       "rightEar",
       best,
-      12,
+      poseConfig.captureConditions.stableMs,
     );
     expect(r.allowCapture).toBe(false);
     expect(r.prompt).toBe("TURN_BACK");
@@ -441,7 +523,7 @@ describe("quality-driven personal best yaw", () => {
       poseConfig,
       "rightEar",
       best,
-      12,
+      poseConfig.captureConditions.stableMs,
     );
     expect(at45.prompt).toBe("READY");
     expect(at45.allowCapture).toBe(true);
@@ -451,7 +533,7 @@ describe("quality-driven personal best yaw", () => {
       poseConfig,
       "rightEar",
       best,
-      12,
+      poseConfig.captureConditions.stableMs,
     );
     expect(at80.allowCapture).toBe(false);
     expect(at80.prompt).not.toBe("READY");
@@ -474,7 +556,7 @@ describe("quality-driven personal best yaw", () => {
       poseConfig,
       "leftEar",
       best,
-      12,
+      poseConfig.captureConditions.stableMs,
     );
     expect(r.prompt).toBe("READY");
   });
@@ -487,7 +569,7 @@ describe("quality-driven personal best yaw", () => {
       poseConfig,
       "rightEar",
       best,
-      12,
+      poseConfig.captureConditions.stableMs,
     );
     expect(r.allowCapture).toBe(false);
     expect(r.prompt).not.toBe("READY");
@@ -500,7 +582,7 @@ describe("quality-driven personal best yaw", () => {
       poseConfig,
       "rightEar",
       best,
-      12,
+      poseConfig.captureConditions.stableMs,
     );
     expect(r.allowCapture).toBe(false);
     expect(r.poseReady).toBe(false);
@@ -513,7 +595,7 @@ describe("quality-driven personal best yaw", () => {
       poseConfig,
       "rightEar",
       best,
-      12,
+      poseConfig.captureConditions.stableMs,
       { wasReady: true },
     );
     expect(r.poseReady).toBe(true);
@@ -528,7 +610,7 @@ describe("quality-driven personal best yaw", () => {
       poseConfig,
       "rightEar",
       best,
-      12,
+      poseConfig.captureConditions.stableMs,
     );
     expect(r.allowCapture).toBe(false);
     expect(r.prompt).toBe("TURN_BACK_OVERSHOOT");
@@ -543,7 +625,7 @@ describe("quality-driven personal best yaw", () => {
       "rightEar",
       best,
       0,
-      { yawDelta: 10, yawDeltaSigned: -10 },
+      { angularVelocityDegPerSec: { yaw: -10, pitch: 0, roll: 0 } },
     );
     expect(r.prompt).toBe("NEAR_PEAK");
     expect(r.prompt).not.toBe("TURN_MORE");
@@ -597,7 +679,7 @@ describe("quality-driven personal best yaw", () => {
       poseConfig,
       "rightEar",
       null,
-      12,
+      poseConfig.captureConditions.stableMs,
     );
     expect(learning.targets.locked).toBe(false);
     expect(learning.prompt).not.toBe("HOLD_STILL");
@@ -658,7 +740,7 @@ describe("quality-driven personal best yaw", () => {
       poseConfig,
       "rightEar",
       best,
-      12,
+      poseConfig.captureConditions.stableMs,
       { softPeak: true },
     );
     expect(soft.allowCapture).toBe(true);
@@ -668,12 +750,12 @@ describe("quality-driven personal best yaw", () => {
       poseConfig,
       "rightEar",
       best,
-      12,
+      poseConfig.captureConditions.stableMs,
     );
     expect(ready.prompt).toBe("READY");
   });
 
-  it("a brief wobble does not grey the shutter once capture was allowed", () => {
+  it("previous READY never bypasses the stable-time requirement", () => {
     const best = peakAt(45);
     const held = evaluateGuidance(
       base({ yaw: 45 }),
@@ -683,8 +765,8 @@ describe("quality-driven personal best yaw", () => {
       1,
       { wasCapturable: true },
     );
-    expect(held.allowCapture).toBe(true);
-    expect(held.prompt).toBe("READY");
+    expect(held.allowCapture).toBe(false);
+    expect(held.prompt).toBe("NEAR_PEAK");
     const cold = evaluateGuidance(
       base({ yaw: 45 }),
       poseConfig,
@@ -720,7 +802,7 @@ describe("quality-driven personal best yaw", () => {
       poseConfig,
       "rightEar",
       best,
-      12,
+      poseConfig.captureConditions.stableMs,
     );
     expect(blocked.allowCapture).toBe(false);
     const held = evaluateGuidance(
@@ -728,45 +810,26 @@ describe("quality-driven personal best yaw", () => {
       poseConfig,
       "rightEar",
       best,
-      12,
+      poseConfig.captureConditions.stableMs,
       { wasCapturable: true },
     );
     expect(held.allowCapture).toBe(true);
     expect(held.prompt).toBe("READY");
   });
 
-  it("wobble hysteresis does not collapse SOFT_READY into READY", () => {
+  it("a qualified soft peak remains SOFT_READY after the full stable time", () => {
     const best = peakAt(45);
     const held = evaluateGuidance(
       base({ yaw: 45 }),
       poseConfig,
       "rightEar",
       best,
-      1,
+      poseConfig.captureConditions.stableMs,
       { wasCapturable: true, softPeak: true },
     );
     expect(held.allowCapture).toBe(true);
     expect(held.prompt).toBe("SOFT_READY");
     expect(held.prompt).not.toBe("READY");
-  });
-});
-
-describe("stable-frame decay", () => {
-  it("one jitter subtracts credit instead of clearing the hold", () => {
-    const steady: EulerDeg = { yaw: 45, pitch: 0, roll: 0 };
-    const wobble: EulerDeg = { yaw: 50, pitch: 0, roll: 0 };
-    let count = 0;
-    let prev: EulerDeg | null = null;
-    for (let i = 0; i < 8; i++) {
-      count = stepStableFrames(count, steady, prev, poseConfig);
-      prev = steady;
-    }
-    expect(count).toBe(7);
-    count = stepStableFrames(count, wobble, prev, poseConfig);
-    expect(count).toBe(7 - poseConfig.ready.stableDecay);
-    expect(count).toBeGreaterThan(0);
-    count = stepStableFrames(count, steady, wobble, poseConfig);
-    expect(count).toBeGreaterThan(0);
   });
 });
 
@@ -968,7 +1031,7 @@ describe("settled personal peak", () => {
       poseConfig,
       "rightEar",
       settled.peak,
-      12,
+      poseConfig.captureConditions.stableMs,
     );
     expect(ready.allowCapture).toBe(true);
     expect(ready.prompt).toBe("READY");
@@ -1012,6 +1075,7 @@ describe("camera peak learning and capture", () => {
     localStorage.setItem("auto-ear-detect:chosen-side:v1", "rightEar");
     Object.assign(cameraFixture, {
       visible: true, faceCount: 1, heightRatio: 0.4, presence: 1, tracking: 1,
+      reportScores: true, roiShortEdge: 100, yaw: 45,
       quality: { ...sharp },
     });
     vi.mocked(measureEarQuality).mockClear();
@@ -1048,6 +1112,12 @@ describe("camera peak learning and capture", () => {
       videoHeight: { configurable: true, value: 480 },
       currentTime: { configurable: true, get: () => videoTime },
     });
+    // Warm up motion while quality is ineligible; this must not learn a peak
+    // or earn any stable-time credit.
+    cameraFixture.quality.laplacian = 0;
+    for (let i = 0; i < 6; i++) frame();
+    cameraFixture.quality = { ...sharp };
+    vi.mocked(measureEarQuality).mockClear();
   });
 
   afterEach(() => {
@@ -1071,15 +1141,14 @@ describe("camera peak learning and capture", () => {
   }
 
   function reachReady() {
-    for (let i = 0; i < 20 && captureButton().disabled; i++) frame();
+    for (let i = 0; i < 65 && captureButton().disabled; i++) frame();
     expect(captureButton().disabled).toBe(false);
   }
 
   it.each([
     ["clipped ROI", () => { cameraFixture.visible = false; }],
     ["multiple returned faces", () => { cameraFixture.faceCount = 2; }],
-    ["too distant face", () => { cameraFixture.heightRatio = 0.1; }],
-    ["too close face", () => { cameraFixture.heightRatio = 0.9; }],
+    ["insufficient native ROI pixels", () => { cameraFixture.roiShortEdge = 20; }],
     ["low presence", () => { cameraFixture.presence = 0.1; }],
     ["low tracking", () => { cameraFixture.tracking = 0.1; }],
     ["dark ROI", () => { cameraFixture.quality.brightness = 20; }],
@@ -1091,6 +1160,7 @@ describe("camera peak learning and capture", () => {
     frame();
     Object.assign(cameraFixture, {
       visible: true, faceCount: 1, heightRatio: 0.4, presence: 1, tracking: 1,
+      reportScores: true, roiShortEdge: 100, yaw: 45,
       quality: { ...sharp },
     });
     frame();
@@ -1122,6 +1192,70 @@ describe("camera peak learning and capture", () => {
     act(() => captureButton().click());
     expect(container.querySelector(".preview img")).toBeNull();
     expect(HTMLCanvasElement.prototype.toDataURL).not.toHaveBeenCalled();
+  });
+
+  it("requires a new complete hold after blurred frames recover", () => {
+    reachReady();
+    cameraFixture.quality.laplacian = 0;
+    for (let i = 0; i < 30; i++) frame();
+    cameraFixture.quality = { ...sharp };
+    frame();
+    expect(captureButton().disabled).toBe(true);
+    for (let i = 0; i < 10; i++) frame();
+    expect(captureButton().disabled).toBe(true);
+    reachReady();
+  });
+
+  it("invalidates READY on a frozen video without resampling the frozen pixels", () => {
+    reachReady();
+    const measured = vi.mocked(measureEarQuality).mock.calls.length;
+    for (let i = 0; i < 3; i++) {
+      now += 600;
+      const callback = nextFrame!;
+      act(() => callback(now));
+    }
+    expect(captureButton().disabled).toBe(true);
+    expect(measureEarQuality).toHaveBeenCalledTimes(measured);
+    frame();
+    expect(captureButton().disabled).toBe(true);
+  });
+
+  it("accepts geometric tracking when scores are genuinely absent", () => {
+    cameraFixture.reportScores = false;
+    reachReady();
+  });
+
+  it("does not treat protobuf default-zero visibility as a reported confidence", () => {
+    cameraFixture.tracking = 0;
+    reachReady();
+  });
+
+  it.each([0.1, 0.9])("uses native ROI evidence with a coarse face ratio of %s", (ratio) => {
+    cameraFixture.heightRatio = ratio;
+    reachReady();
+  });
+
+  it("immediately invalidates the shutter when the camera is explicitly closed", () => {
+    reachReady();
+    const close = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "closeCamera")!;
+    act(() => close.click());
+    expect(captureButton().disabled).toBe(true);
+  });
+
+  it("isolates simulator timing and peaks from the real camera", () => {
+    reachReady();
+    const saved = localStorage.getItem("auto-ear-detect:best-yaw:v1");
+    const toggle = container.querySelector<HTMLInputElement>("details.sim input[type=checkbox]")!;
+    act(() => toggle.click());
+    expect(captureButton().disabled).toBe(true);
+    expect(container.querySelector(".calib-note")?.textContent).toBe("learningNote");
+    for (let i = 0; i < 12; i++) frame();
+    expect(localStorage.getItem("auto-ear-detect:best-yaw:v1")).toBe(saved);
+    act(() => toggle.click());
+    expect(captureButton().disabled).toBe(true);
+    expect(localStorage.getItem("auto-ear-detect:best-yaw:v1")).toBe(saved);
+    reachReady();
   });
 
   it("auto-captures the validated burst without remeasuring with stale pose", () => {
@@ -1200,7 +1334,7 @@ describe("prompt dwell", () => {
       "rightEar",
       null,
       0,
-      { yawDelta: 50 }, // 20° → 70° in one frame
+      { angularVelocityDegPerSec: { yaw: 50, pitch: 0, roll: 0 } }, // 20° → 70° in one frame
     );
     expect(jumped.prompt).toBe("SLOW_DOWN");
     expect(jumped.allowCapture).toBe(false);
@@ -1217,7 +1351,7 @@ describe("prompt dwell", () => {
       "rightEar",
       null,
       0,
-      { yawDelta: 0 },
+      { angularVelocityDegPerSec: { yaw: 0, pitch: 0, roll: 0 } },
     );
     expect(settled.prompt).toBe("SWEEP_RIGHT_EAR");
     dwell = dwellPrompt(dwell, settled.prompt, 250, ux);

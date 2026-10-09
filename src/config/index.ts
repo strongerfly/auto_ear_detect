@@ -17,6 +17,8 @@ export type PromptKey =
   | "SLOW_DOWN"
   | "WRONG_SIDE"
   | "CLEAR_HAIR"
+  | "BLURRY_EAR"
+  | "CHECK_EAR"
   | "HOLD_STILL"
   | "NEAR_PEAK"
   | "BAD_LIGHT"
@@ -50,6 +52,8 @@ export const PROMPT_KEYS: PromptKey[] = [
   "SLOW_DOWN",
   "WRONG_SIDE",
   "CLEAR_HAIR",
+  "BLURRY_EAR",
+  "CHECK_EAR",
   "HOLD_STILL",
   "NEAR_PEAK",
   "BAD_LIGHT",

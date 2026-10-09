@@ -88,7 +88,9 @@ const zh: Messages = {
   SLOW_DOWN: "转慢一点",
   WRONG_SIDE:
     "方向反了：拍右耳向左转，拍左耳向右转（身体的左右，不要跟着镜子）",
-  CLEAR_HAIR: "拨开耳边头发（糊了或反光也先试试）",
+  CLEAR_HAIR: "请拨开遮住耳朵的头发",
+  BLURRY_EAR: "耳部图像模糊，请保持不动，等待对焦；仍模糊时检查镜头",
+  CHECK_EAR: "耳部细节不足，请让整只耳朵露出，检查位置和遮挡",
   HOLD_STILL: "很好，保持不动",
   NEAR_PEAK: "快到了，慢慢对准最清楚的角度",
   BAD_LIGHT: "光线不太好，换亮一点的地方",
@@ -100,7 +102,7 @@ const zh: Messages = {
   INTRO_RIGHT: "现在拍右耳（身体的右耳，不是镜子）。慢慢向左转。",
   PICK_SIDE: "先选要拍哪只耳朵（身体的左/右，不是屏幕或镜子）",
   STUCK_NO_PROGRESS:
-    "这侧一直没更清楚。拨开头发、换亮一点，或重新学习后再慢慢转。",
+    "这侧一直没更清楚。检查耳部是否露出、光线亮度与对焦，或重新学习后再慢慢转。",
   SOFT_READY: "这是这侧目前最清楚的角度，可以拍；看起来不对就重新学习。",
   EAR_OUT_OF_FRAME: "耳朵出画了，挪一挪把整只耳朵留在画面里",
 
@@ -173,7 +175,7 @@ const zh: Messages = {
     "用前置摄像头。第一次先选「拍左耳」或「拍右耳」（身体的左右，不是镜子）；选过会记住，没选之前不能拍。切换左右会重新引导这一侧，另一侧记住的角度还在。拍右耳 → 向左转头；拍左耳 → 向右转头。转的是头，不是电脑或手机。跟着提示走，不要对着镜子反着学。按提示慢慢转头，系统会记住这侧最清楚的角度。\n\n转过头很正常：「往回一点」是朝刚才更清楚的那边转回去，别继续转到后脑勺。转到头了会说「到头了，往回一点」。往回走时先稳住，不要再转更侧。转太快会提示「转慢一点」。\n\n提示「方向反了」是转头方向反了，不是点错了左/右。框在另一只耳朵上时，点另一侧按钮，系统不会自己换。拍完一侧，接着拍另一侧：再点另一侧重转。等到「可以拍了」，或弱峰值时「这是这侧目前最清楚的，可以拍」再拍；默认开着自动快门，倒计时出现时可点「取消自动拍摄」。拍完可重拍或换另一只耳。",
   helpStuckHeading: "拍不了的时候",
   helpStuckBody:
-    "第一次要慢慢转过，系统才会记住这一侧。拍摄按钮是灰的，常见有两种原因：还没学完这一侧；或者已经记住了但还没对准最清楚的角度（提示「快到了」）。等到「可以拍了」，或弱峰值时「这是这侧目前最清楚的，可以拍」才能点。默认开着自动快门，这两种都会倒计时，需要的话点「取消自动拍摄」。\n\n摄像头被拒：到浏览器设置里允许这个网站使用摄像头，然后点「打开摄像头」再试。没有找到摄像头：确认已接上，再点「打开摄像头」。头发挡住、糊了或反光：拨开头发（糊了或反光也先试试），换亮一点。转了很久仍没更清楚时，会出现「再试一次 / 重新学习 / 拨开头发换亮一点」，不会只留一个灰色快门。\n\n换了发型或眼镜、角度记错、一直出不了「可以拍了」：点「重新学习此侧」（再确认一次，只清这一侧记住的角度），再慢慢转一次。误点确认的话，拍不了，直到重新学会。",
+    "第一次要慢慢转过，系统才会记住这一侧。拍摄按钮是灰的，常见有两种原因：还没学完这一侧；或者已经记住了但还没对准最清楚的角度（提示「快到了」）。等到「可以拍了」，或弱峰值时「这是这侧目前最清楚的，可以拍」才能点。默认开着自动快门，这两种都会倒计时，需要的话点「取消自动拍摄」。\n\n摄像头被拒：到浏览器设置里允许这个网站使用摄像头，然后点「打开摄像头」再试。没有找到摄像头：确认已接上，再点「打开摄像头」。头发确实挡住时拨开头发；糊了或反光时，先保持不动，检查对焦并调整光线。转了很久仍没更清楚时，会出现「再试一次 / 重新学习 / 检查位置、光线与对焦」，不会只留一个灰色快门。\n\n换了发型或眼镜、角度记错、一直出不了「可以拍了」：点「重新学习此侧」（再确认一次，只清这一侧记住的角度），再慢慢转一次。误点确认的话，拍不了，直到重新学会。",
   helpLimitsHeading: "小提示",
   helpLimitsBody:
     "不是医院耳镜，一次一只耳朵，也不会检查你是不是点错了侧。头大致摆正、脸在框里、距离合适。太暗、太亮或头发挡住会失败。只有侧着转头时才会学习——几乎正面或转到后脑勺都不算。预览像镜子，保存的照片不是，左右和真人一样。拍完会告诉你这张是否接近最清楚的角度，没有绝对度数。",
@@ -197,7 +199,9 @@ const en: Messages = {
   SLOW_DOWN: "Turn a bit slower",
   WRONG_SIDE:
     "Wrong way: right ear → turn left; left ear → turn right (your body, not the mirror)",
-  CLEAR_HAIR: "Tuck hair away from the ear (also try this if it's blurry or shiny)",
+  CLEAR_HAIR: "Move hair covering the ear aside",
+  BLURRY_EAR: "The ear image is blurry. Hold still and wait for focus; check the lens if blur persists",
+  CHECK_EAR: "Ear detail is insufficient. Show the whole ear and check its position and any obstruction",
   HOLD_STILL: "Good — hold still",
   NEAR_PEAK: "Almost there — ease into the clearest angle",
   BAD_LIGHT: "Lighting is poor — move somewhere brighter",
@@ -212,7 +216,7 @@ const en: Messages = {
   PICK_SIDE:
     "Choose which ear to capture first (your body’s left/right, not the screen)",
   STUCK_NO_PROGRESS:
-    "This side isn’t getting clearer. Tuck hair, find better light, or tap Relearn and turn slowly again.",
+    "This side isn’t getting clearer. Check ear visibility, light and focus, or tap Relearn and turn slowly again.",
   SOFT_READY:
     "This is the clearest we found for this ear — capture, or relearn if it looks off.",
   EAR_OUT_OF_FRAME:
@@ -291,7 +295,7 @@ const en: Messages = {
     "Use the front camera. The first time, choose Left ear or Right ear (your body, not the mirror); that choice is remembered, and capture stays off until you pick a side. Switching sides restarts guidance for that ear and keeps the other side’s remembered angle. Right ear → turn your head left; left ear → turn your head right. Turn your head, not the laptop or phone. Follow the prompt; don’t copy the mirror. Turn slowly as prompted — the app remembers the clearest angle for that side.\n\nOvershoot is normal: “ease back” means toward the clearer pose, not past the back of your head. At the far edge you’ll see “that’s as far as it goes — ease back.” While you return, hold; don’t keep turning farther. If you turn too fast, it asks you to slow down.\n\n“Other way” is the turn direction, not the wrong ear tab. If the box is on the other ear, tap the other side — the app won’t switch for you. After one ear, tap the other side and turn again. Shoot when it says Ready to capture, or — if the peak is weak or flat — “clearest we found for this ear — you can capture.” Auto-shutter is on by default and counts down for both; you can cancel it. After a shot you can retake or switch ears.",
   helpStuckHeading: "If it won’t capture",
   helpStuckBody:
-    "The first time, capture stays off until you’ve slowly swept so the app can learn that side — the button stays grey. It also stays grey after a peak is remembered if you’re not yet on the clearest pose (you’ll see Almost there). You can tap Capture when it says Ready to capture, or when a weak or flat peak says you can capture the clearest frame found. Auto-shutter counts down for both — tap Cancel auto-capture if you need to stop it.\n\nCamera denied: allow this site in your browser settings, then tap Open camera to try again. No camera found: check that one is connected, then tap Open camera. Hair, blur, or glare: tuck hair aside (try this for blur or shine too) and find better light. If nothing gets clearer for a while, you’ll get Try again / Relearn / tuck hair and find better light — not a dead grey shutter.\n\nWrong lock, new glasses or haircut, or you never reach Ready: tap Relearn this side (confirm once; clears this side only) and turn slowly again. An accidental tap to confirm blocks capture until that side is relearned.",
+    "The first time, capture stays off until you’ve slowly swept so the app can learn that side — the button stays grey. It also stays grey after a peak is remembered if you’re not yet on the clearest pose (you’ll see Almost there). You can tap Capture when it says Ready to capture, or when a weak or flat peak says you can capture the clearest frame found. Auto-shutter counts down for both — tap Cancel auto-capture if you need to stop it.\n\nCamera denied: allow this site in your browser settings, then tap Open camera to try again. No camera found: check that one is connected, then tap Open camera. If hair covers the ear, tuck hair aside. For blur, hold still and check focus. For darkness or glare, adjust the light. If nothing gets clearer for a while, you’ll get Try again / Relearn / check position, light and focus — not a dead grey shutter.\n\nWrong lock, new glasses or haircut, or you never reach Ready: tap Relearn this side (confirm once; clears this side only) and turn slowly again. An accidental tap to confirm blocks capture until that side is relearned.",
   helpLimitsHeading: "Tips",
   helpLimitsBody:
     "Not a clinical ear scanner. One ear at a time, and it won’t check that you picked the correct side. Keep your head roughly upright, face in frame, at a comfortable distance. Dark, bright, or hair-blocked shots fail. It only learns while you turn to the side — not almost frontal, not past the back of the head. The preview is a mirror; the saved photo is not — left/right match real life. After a shot you’ll hear whether it was near the clearest angle — no absolute degrees.",

@@ -1,6 +1,18 @@
 {
   "version": 2,
   "captureMode": "qualityPeakYaw",
+  "captureConditions": {
+    "stableMs": 700,
+    "velocityWindowMs": 200,
+    "minVelocityWindowMs": 150,
+    "maxGapMs": 500,
+    "maxAngularSpeedDegPerSec": 8,
+    "maxAngularRangeDeg": 2.5,
+    "slowYawSpeedDegPerSec": 45,
+    "minRoiShortEdgePx": 48,
+    "minRoiVisibleRatio": 0.9,
+    "minCenterSharpnessRatio": 0.35
+  },
   "coordinateConvention": {
     "yawPositive": "rightEarVisible",
     "note": "FISWG: +yaw shows the right ear, -yaw the left. Calibrate matrix→Euler signs to match. User-visible copy lives in src/i18n, not here.",
@@ -58,12 +70,6 @@
     "exitBandDeg": 8,
     "scoreRatioOfBest": 0.92,
     "scoreRatioExit": 0.86,
-    "stableFrames": 12,
-    "stableHoldFrames": 1,
-    "stableDecay": 2,
-    "maxDeltaYawDeg": 3,
-    "maxDeltaPitchDeg": 3,
-    "maxDeltaRollDeg": 3,
     "brightnessMin": 60,
     "brightnessMax": 200,
     "burstFrames": 3,
