@@ -21,21 +21,20 @@ import {
   type BurstCandidate,
 } from "../lib/burst";
 import { cameraNotice } from "../lib/camera-access";
+import { createTimedStability, stepTimedStability } from "../lib/capture-conditions";
 import { dwellPrompt, INITIAL_DWELL, type DwellState } from "../lib/dwell";
 import { matrixToFiswgEuler } from "../lib/euler";
 import {
   captureHintKey,
   captureUiFor,
   evaluateGuidance,
+  evaluateCaptureConditions,
   promptForDisplay,
-  stepStableFrames,
 } from "../lib/guidance";
 import {
   earInFrame,
   earRoiLayout,
   faceHeightRatio,
-  meanPresence,
-  meanVisibility,
 } from "../lib/landmarks";
 import { EulerSmoother } from "../lib/one-euro";
 import {
@@ -45,7 +44,9 @@ import {
 } from "../lib/peak-hygiene";
 import {
   createPeakMemory,
+  isBestYawSampleEligible,
   loadPersonalBests,
+  MAX_PEAK_SAMPLE_GAP_MS,
   savePersonalBests,
   settlePersonalBest,
   yawInSearchWindow,
@@ -64,7 +65,7 @@ import {
   loadChosenSide,
   saveChosenSide,
 } from "../lib/chosen-side";
-import { createProgress, retryProgress, stepProgress } from "../lib/progress";
+import { createProgress, stepProgress } from "../lib/progress";
 import {
   frontalQualityScore,
   measureEarQuality,
@@ -87,10 +88,24 @@ type BurstPayload = {
   canvas: HTMLCanvasElement;
   yaw: number | null;
   quality: EarQuality | null;
+  timestampMs: number;
+  side: EarSide;
 };
 
+function reportedConfidence(points: { presence?: number; visibility?: number }[],
+  field: "presence" | "visibility"): number | null {
+  const scores = points.map((p) => p[field]).filter((v) => v !== undefined);
+  if (scores.length === 0) return null;
+  if (scores.some((v) => !Number.isFinite(v) || v < 0 || v > 1)) return NaN;
+  // tasks-vision converts an absent protobuf visibility field to zero.
+  // An all-zero Face Landmarker array therefore supplies no visibility score.
+  if (field === "visibility" && scores.every((v) => v === 0)) return null;
+  // Retain zero/invalid reported scores. Absence must not be fabricated as 1.
+  return scores.reduce((sum, v) => sum + v, 0) / scores.length;
+}
+
 function readRoiQuality(
-  video: HTMLVideoElement,
+  video: HTMLCanvasElement,
   roi: RoiBox,
   scratch: HTMLCanvasElement,
 ): EarQuality | null {
@@ -104,13 +119,16 @@ function readRoiQuality(
 }
 
 function paintVideoFrame(
-  video: HTMLVideoElement,
+  video: HTMLVideoElement | HTMLCanvasElement,
   canvas: HTMLCanvasElement,
 ): HTMLCanvasElement {
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
+  canvas.width = "videoWidth" in video ? video.videoWidth : video.width;
+  canvas.height = "videoHeight" in video ? video.videoHeight : video.height;
   const context = canvas.getContext("2d");
-  if (context && video.videoWidth > 0) context.drawImage(video, 0, 0);
+  if (!context || canvas.width <= 0 || canvas.height <= 0) {
+    throw new Error("camera_frame_unavailable");
+  }
+  context.drawImage(video, 0, 0);
   return canvas;
 }
 
@@ -153,6 +171,7 @@ export function EarCaptureApp() {
     useFaceLandmarker();
   const overlayRef = useRef<HTMLCanvasElement | null>(null);
   const sampleRef = useRef<HTMLCanvasElement | null>(null);
+  const cameraFrameRef = useRef<HTMLCanvasElement | null>(null);
   const tRef = useRef(t);
   tRef.current = t;
 
@@ -177,15 +196,17 @@ export function EarCaptureApp() {
 
   const sideRef = useRef(side);
   const bestsRef = useRef(bests);
+  const cameraBestsRef = useRef(bests);
+  const simulatorBestsRef = useRef<PersonalBestMap>({ leftEar: null, rightEar: null });
   const simRef = useRef(sim);
   const autoShutterRef = useRef(autoShutter);
   const shutterLatch = useRef(false);
   const countdownStartedAt = useRef<number | null>(null);
   const cancelReadyEpisode = useRef(false);
   const dwellRef = useRef<DwellState>(INITIAL_DWELL);
-  const lastAngles = useRef<EulerDeg | null>(null);
-  const stableFrames = useRef(0);
+  const timedStability = useRef(createTimedStability());
   const lastVideoTime = useRef(-1);
+  const lastSampleTime = useRef<number | null>(null);
   const smootherRef = useRef<EulerSmoother | null>(null);
   const readyBurst = useRef(0);
   const bootNow =
@@ -212,6 +233,23 @@ export function EarCaptureApp() {
     smootherRef.current = new EulerSmoother(o.minCutoff, o.beta, o.dCutoff);
   }, []);
 
+  const resetCaptureTiming = useCallback(() => {
+    timedStability.current = createTimedStability();
+    lastSampleTime.current = null;
+    lastVideoTime.current = -1;
+    smootherRef.current?.reset();
+    peakMemoryRef.current = createPeakMemory();
+    smoothedQualityRef.current = null;
+    wasReadyRef.current = false;
+    wasCapturableRef.current = false;
+    shutterLatch.current = false;
+    readyBurst.current = 0;
+    countdownStartedAt.current = null;
+    cancelReadyEpisode.current = false;
+    burstRef.current = [];
+    lastBurstVideoTimeRef.current = -1;
+  }, []);
+
   const resetSideSession = useCallback((nextSide: EarSide, now = performance.now()) => {
     dwellRef.current = {
       displayed: introPromptFor(nextSide),
@@ -222,9 +260,7 @@ export function EarCaptureApp() {
     countdownStartedAt.current = null;
     cancelReadyEpisode.current = false;
     readyBurst.current = 0;
-    stableFrames.current = 0;
-    lastAngles.current = null;
-    smootherRef.current?.reset();
+    resetCaptureTiming();
     progressRef.current = createProgress(now);
     introUntilRef.current = sideIntroUntil(now);
     sweepRef.current = EMPTY_SWEEP;
@@ -242,7 +278,52 @@ export function EarCaptureApp() {
       prompt: introPromptFor(nextSide),
       shutterCountdownMs: null,
     });
-  }, []);
+  }, [resetCaptureTiming]);
+
+  useEffect(() => {
+    const invalidate = () => {
+      resetCaptureTiming();
+      setLive((prev) => ({ ...prev, allowCapture: false, shutterCountdownMs: null }));
+    };
+    const visibility = () => { if (document.hidden) invalidate(); };
+    const video = videoRef.current;
+    document.addEventListener("visibilitychange", visibility);
+    video?.addEventListener("ended", invalidate);
+    video?.addEventListener("emptied", invalidate);
+    return () => {
+      document.removeEventListener("visibilitychange", visibility);
+      video?.removeEventListener("ended", invalidate);
+      video?.removeEventListener("emptied", invalidate);
+    };
+  }, [resetCaptureTiming, videoRef]);
+
+  const changeSimulator = (next: SimState) => {
+    if (next.enabled !== simRef.current.enabled) {
+      if (next.enabled) cameraBestsRef.current = bestsRef.current;
+      else simulatorBestsRef.current = bestsRef.current;
+      const nextBests = next.enabled ? simulatorBestsRef.current : cameraBestsRef.current;
+      bestsRef.current = nextBests;
+      setBests(nextBests);
+      setLastCapture(null);
+      setCaptureFeedback(null);
+      const current = sideRef.current;
+      if (isSideChosen(current)) resetSideSession(current);
+      else resetCaptureTiming();
+    }
+    simRef.current = next;
+    setSim(next);
+  };
+
+  const startCamera = () => {
+    resetCaptureTiming();
+    setLive((prev) => ({ ...prev, allowCapture: false, shutterCountdownMs: null }));
+    void start();
+  };
+  const stopCamera = () => {
+    resetCaptureTiming();
+    setLive((prev) => ({ ...prev, allowCapture: false, shutterCountdownMs: null }));
+    stop();
+  };
 
   const selectSide = useCallback(
     (next: EarSide) => {
@@ -306,11 +387,12 @@ export function EarCaptureApp() {
   liveRef.current = live;
 
   const rememberVideoBurst = useCallback(
-    (video: HTMLVideoElement, score: number, yaw: number | null, quality: EarQuality | null) => {
+    (video: HTMLCanvasElement, videoTime: number, sampledAtMs: number,
+      score: number, yaw: number | null, quality: EarQuality | null) => {
       const limit = poseConfig.ready.burstFrames;
       if (
         burstRef.current.length > 0 &&
-        lastBurstVideoTimeRef.current === video.currentTime
+        lastBurstVideoTimeRef.current === videoTime
       ) {
         const last = burstRef.current[burstRef.current.length - 1];
         const next = burstRef.current.slice();
@@ -320,6 +402,8 @@ export function EarCaptureApp() {
             canvas: paintVideoFrame(video, last.payload.canvas),
             yaw,
             quality,
+            timestampMs: sampledAtMs,
+            side: sideRef.current!,
           },
         };
         burstRef.current = next;
@@ -337,18 +421,20 @@ export function EarCaptureApp() {
             canvas: paintVideoFrame(video, recycle),
             yaw,
             quality,
+            timestampMs: sampledAtMs,
+            side: sideRef.current!,
           },
         },
         limit,
       );
-      lastBurstVideoTimeRef.current = video.currentTime;
+      lastBurstVideoTimeRef.current = videoTime;
     },
     [],
   );
 
   const captureStill = useCallback(() => {
     const chosen = sideRef.current;
-    if (!isSideChosen(chosen)) return;
+    if (!isSideChosen(chosen) || capturedThisSideRef.current) return;
     const video = videoRef.current;
     const canvas = document.createElement("canvas");
     const snap = liveRef.current;
@@ -358,49 +444,42 @@ export function EarCaptureApp() {
         ? frontalQualityScore(snap.quality, snap.yaw)
         : (bestsRef.current[chosen]?.score ?? 0);
     let savedCanvas: HTMLCanvasElement | null = null;
-    if (!simRef.current.enabled && video && video.readyState >= 2 && video.videoWidth > 0) {
-      let quality = snap.quality;
-      const scratch = sampleRef.current;
-      if (snap.roi && scratch) {
-        const remeasured = readRoiQuality(video, snap.roi, scratch);
-        if (remeasured) quality = remeasured;
-      }
-      const yaw = snap.yaw;
-      const score =
-        quality && yaw != null ? frontalQualityScore(quality, yaw) : capturedScore;
-      rememberVideoBurst(video, score, yaw, quality);
+    if (!simRef.current.enabled) {
+      // Each candidate already has matching pixels, pose and measured quality.
+      // Re-scoring here with liveRef would mix the new video frame with old pose.
       const best = pickBurstCandidate(
-        burstRef.current,
+        burstRef.current.filter((frame) => frame.payload.side === chosen &&
+          performance.now() - frame.payload.timestampMs >= 0 &&
+          performance.now() - frame.payload.timestampMs <= poseConfig.captureConditions.maxGapMs),
         poseConfig.ready.pickBurstBy,
       );
-      if (best) {
-        savedCanvas = best.payload.canvas;
-        capturedScore = best.score;
+      const sampleTime = lastSampleTime.current;
+      if (!snap.allowCapture || !video || video.readyState < 2 || video.videoWidth <= 0 || !best ||
+          sampleTime === null || performance.now() - sampleTime > MAX_PEAK_SAMPLE_GAP_MS) {
+        resetCaptureTiming();
+        setLive((prev) => ({ ...prev, allowCapture: false, shutterCountdownMs: null }));
+        return;
       }
+      savedCanvas = best.payload.canvas;
+      capturedScore = best.score;
     }
-    if (simRef.current.enabled || !video || video.readyState < 2 || !savedCanvas) {
+    if (simRef.current.enabled) {
       canvas.width = 960;
       canvas.height = 540;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      if (simRef.current.enabled || !video || video.readyState < 2) {
-        drawSimStill(
-          ctx,
-          canvas.width,
-          canvas.height,
-          chosen,
-          simRef.current,
-          snap.yaw,
-          snap.pitch,
-          snap.roll,
-          label(chosen === "rightEar" ? "simStillRight" : "simStillLeft"),
-          label(chosen === "rightEar" ? "roiRight" : "roiLeft"),
-        );
-      } else {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0);
-      }
+      drawSimStill(
+        ctx,
+        canvas.width,
+        canvas.height,
+        chosen,
+        simRef.current,
+        snap.yaw,
+        snap.pitch,
+        snap.roll,
+        label(chosen === "rightEar" ? "simStillRight" : "simStillLeft"),
+        label(chosen === "rightEar" ? "roiRight" : "roiLeft"),
+      );
     }
     const url = (savedCanvas ?? canvas).toDataURL("image/png");
     burstRef.current = [];
@@ -418,7 +497,7 @@ export function EarCaptureApp() {
         snap.softReady,
       ),
     );
-  }, [rememberVideoBurst, videoRef]);
+  }, [videoRef, resetCaptureTiming]);
 
   const captureStillRef = useRef(captureStill);
   captureStillRef.current = captureStill;
@@ -460,14 +539,16 @@ export function EarCaptureApp() {
       let pitch: number | null = null;
       let roll: number | null = null;
       let hasFace = false;
-      let presence = 0;
-      let tracking = 0;
+      let presence: number | null = null;
+      let tracking: number | null = null;
       let heightRatio = 0;
       let roi: RoiBox | null = null;
       let quality: EarQuality | null = null;
       let faceCount = 0;
       let earVisible: boolean | undefined;
       let didSample = false;
+      let rawAngles: EulerDeg | null = null;
+      let cameraFrame: HTMLCanvasElement | null = null;
 
       if (simState.enabled) {
         didSample = true;
@@ -479,6 +560,7 @@ export function EarCaptureApp() {
         yaw = simState.yaw;
         pitch = simState.pitch;
         roll = simState.roll;
+        rawAngles = { yaw, pitch, roll };
         quality = simState.qualityFollowsYaw
           ? qualityAlongYawCurve(
               simState.yaw,
@@ -499,40 +581,54 @@ export function EarCaptureApp() {
         lastVideoTime.current = video.currentTime;
         let result: FaceLandmarkerResult | null = null;
         try {
-          result = landmarker.detectForVideo(video, now);
+          const frozen = cameraFrameRef.current ?? document.createElement("canvas");
+          cameraFrameRef.current = frozen;
+          cameraFrame = paintVideoFrame(video, frozen);
+          result = landmarker.detectForVideo(cameraFrame, now);
         } catch {
           result = null;
         }
         const face = result?.faceLandmarks?.[0];
         const mat = result?.facialTransformationMatrixes?.[0];
         faceCount = result?.faceLandmarks?.length ?? 0;
-        if (face && mat?.data) {
-          hasFace = true;
-          presence = meanPresence(face);
-          tracking = meanVisibility(face);
-          heightRatio = faceHeightRatio(face);
-          let euler = matrixToFiswgEuler(mat.data);
-          if (poseConfig.smoothing.enabled && smootherRef.current) {
-            euler = smootherRef.current.filter(
-              euler.yaw,
-              euler.pitch,
-              euler.roll,
-              now,
+        if (face && mat?.data?.length === 16 && Array.from(mat.data).every(Number.isFinite)) {
+          try {
+            hasFace = true;
+            presence = reportedConfidence(face, "presence");
+            tracking = reportedConfidence(face, "visibility");
+            heightRatio = faceHeightRatio(face);
+            let euler = matrixToFiswgEuler(mat.data);
+            rawAngles = euler;
+            if (poseConfig.smoothing.enabled && smootherRef.current) {
+              euler = smootherRef.current.filter(
+                euler.yaw,
+                euler.pitch,
+                euler.roll,
+                now,
+              );
+            }
+            yaw = euler.yaw;
+            pitch = euler.pitch;
+            roll = euler.roll;
+            const layout = earRoiLayout(
+              face,
+              currentSide,
+              cameraFrame!.width,
+              cameraFrame!.height,
             );
-          }
-          yaw = euler.yaw;
-          pitch = euler.pitch;
-          roll = euler.roll;
-          const layout = earRoiLayout(
-            face,
-            currentSide,
-            video.videoWidth,
-            video.videoHeight,
-          );
-          roi = layout.roi;
-          earVisible = earInFrame(layout.visibleRatio);
-          if (roi && scratch) {
-            quality = readRoiQuality(video, roi, scratch);
+            roi = layout.roi;
+            earVisible = earInFrame(layout.visibleRatio) &&
+              layout.visibleRatio >= poseConfig.captureConditions.minRoiVisibleRatio;
+            if (roi && scratch && cameraFrame) {
+              quality = readRoiQuality(cameraFrame, roi, scratch);
+            }
+          } catch {
+            hasFace = false;
+            rawAngles = null;
+            yaw = pitch = roll = null;
+            roi = null;
+            quality = null;
+            smootherRef.current?.reset();
           }
         } else {
           smootherRef.current?.reset();
@@ -557,7 +653,39 @@ export function EarCaptureApp() {
       ) {
         // Same video frame as the last sample. Leave the overlay and the
         // peak alone — a duplicate rAF is not a face-loss blip.
+        if (lastSampleTime.current !== null &&
+            now - lastSampleTime.current > poseConfig.captureConditions.maxGapMs) {
+          const frozenVideoTime = lastVideoTime.current;
+          resetCaptureTiming();
+          lastVideoTime.current = frozenVideoTime;
+          setLive((prev) => ({ ...prev, prompt: "NO_FACE", allowCapture: false,
+            shutterCountdownMs: null }));
+        }
         return;
+      }
+
+      if (didSample) {
+        const previousTime = lastSampleTime.current;
+        if (previousTime !== null &&
+            (now <= previousTime || now - previousTime > MAX_PEAK_SAMPLE_GAP_MS)) {
+          // An interrupted camera stream is not an uninterrupted stable hold.
+          timedStability.current = createTimedStability();
+          smootherRef.current?.reset();
+          peakMemoryRef.current = createPeakMemory();
+          smoothedQualityRef.current = null;
+          wasReadyRef.current = false;
+          wasCapturableRef.current = false;
+          readyBurst.current = 0;
+          countdownStartedAt.current = null;
+          burstRef.current = [];
+          lastBurstVideoTimeRef.current = -1;
+          if (rawAngles) {
+            yaw = rawAngles.yaw;
+            pitch = rawAngles.pitch;
+            roll = rawAngles.roll;
+          }
+        }
+        lastSampleTime.current = now;
       }
 
       const angles: EulerDeg | null =
@@ -565,23 +693,22 @@ export function EarCaptureApp() {
           ? null
           : { yaw, pitch, roll };
 
-      if (!hasFace || !angles) {
-        stableFrames.current = 0;
-        lastAngles.current = null;
-      } else {
-        stableFrames.current = stepStableFrames(
-          stableFrames.current,
-          angles,
-          lastAngles.current,
-          poseConfig,
-        );
-      }
-      const yawDeltaSigned =
-        lastAngles.current && angles
-          ? angles.yaw - lastAngles.current.yaw
-          : 0;
-      const yawDelta = Math.abs(yawDeltaSigned);
-      lastAngles.current = angles;
+      const input = {
+        hasFace, facePresence: presence, trackingConfidence: tracking,
+        faceHeightRatio: heightRatio, yaw: yaw ?? NaN, pitch: pitch ?? NaN,
+        roll: roll ?? NaN, quality, faceCount,
+      };
+      const conditions = evaluateCaptureConditions(input, poseConfig, {
+        source: simState.enabled ? "simulator" : "camera",
+        earInFrame: earVisible,
+        roiShortEdgePx: roi ? Math.min(roi.w, roi.h) : undefined,
+        timestampMs: now,
+      });
+      const motion = stepTimedStability(timedStability.current, {
+        timestampMs: now, angles: rawAngles, eligible: false,
+        source: simState.enabled ? "simulator" : "camera", side: currentSide,
+      }, poseConfig.captureConditions);
+      const angularVelocity = motion.velocityAvailable ? motion.velocityDegPerSec : null;
 
       let allowPeakUpdate = false;
       if (didSample) {
@@ -596,28 +723,43 @@ export function EarCaptureApp() {
         );
         hygieneRef.current = hygiene.state;
         allowPeakUpdate = hygiene.allowPeakUpdate;
-        if (!hasFace) {
-          smoothedQualityRef.current = null;
-          peakMemoryRef.current = createPeakMemory();
-        }
       }
 
+      const peakSample = angles && quality ? {
+        ...angles,
+        quality,
+        side: currentSide,
+        // Legacy peak API uses a delta; velocity is the actual learning gate.
+        yawDelta: 0,
+        timestampMs: now,
+      } : null;
+      // A sharp crop must also belong to one well-tracked, correctly sized face.
+      const canLearnPeak = allowPeakUpdate && conditions.eligible &&
+        angularVelocity !== null && [angularVelocity.yaw, angularVelocity.pitch,
+          angularVelocity.roll].every((v) => Math.abs(v) <
+            poseConfig.captureConditions.slowYawSpeedDegPerSec) &&
+        peakSample !== null && isBestYawSampleEligible(peakSample);
+      if (!canLearnPeak) {
+        smoothedQualityRef.current = null;
+        peakMemoryRef.current = createPeakMemory();
+      }
       const peakQuality =
-        quality && allowPeakUpdate
+        peakSample && canLearnPeak
           ? smoothEarQuality(
               smoothedQualityRef.current,
-              quality,
+              peakSample.quality,
               poseConfig.score.smoothAlpha,
             )
           : null;
       if (peakQuality) smoothedQualityRef.current = peakQuality;
 
-      if (hasFace && angles && peakQuality) {
-        if (yawInSearchWindow(angles.yaw, currentSide)) {
+      if (peakSample && peakQuality) {
+        const { yaw } = peakSample;
+        if (yawInSearchWindow(yaw, currentSide)) {
           sweepRef.current = noteSweepSample(
             sweepRef.current,
-            angles.yaw,
-            frontalQualityScore(peakQuality, angles.yaw),
+            yaw,
+            frontalQualityScore(peakQuality, yaw),
           );
         }
         const prevPeak = bestsRef.current[currentSide];
@@ -625,12 +767,8 @@ export function EarCaptureApp() {
           prevPeak,
           peakMemoryRef.current,
           {
-            yaw: angles.yaw,
-            pitch: angles.pitch,
-            roll: angles.roll,
+            ...peakSample,
             quality: peakQuality,
-            side: currentSide,
-            yawDelta,
           },
         );
         peakMemoryRef.current = settled.memory;
@@ -639,38 +777,34 @@ export function EarCaptureApp() {
           const nextMap = { ...bestsRef.current, [currentSide]: nextPeak };
           bestsRef.current = nextMap;
           setBests(nextMap);
-          savePersonalBests(nextMap);
+          if (simState.enabled) simulatorBestsRef.current = nextMap;
+          else {
+            cameraBestsRef.current = nextMap;
+            savePersonalBests(nextMap);
+          }
         }
       }
 
-      const guidance = evaluateGuidance(
-        {
-          hasFace,
-          facePresence: presence,
-          trackingConfidence: tracking,
-          faceHeightRatio: heightRatio,
-          yaw: yaw ?? 0,
-          pitch: pitch ?? 0,
-          roll: roll ?? 0,
-          quality,
-          faceCount,
-        },
-        poseConfig,
-        currentSide,
-        bestsRef.current[currentSide],
-        stableFrames.current,
-        {
-          yawDelta,
-          yawDeltaSigned,
-          wasReady: wasReadyRef.current,
-          earInFrame: earVisible,
-          softPeak: isSoftPeak(
-            sweepRef.current,
-            bestsRef.current[currentSide]?.score ?? null,
-          ),
-          wasCapturable: wasCapturableRef.current,
-        },
-      );
+      const extras = {
+        conditions,
+        angularVelocityDegPerSec: angularVelocity,
+        wasReady: wasReadyRef.current,
+        earInFrame: earVisible,
+        softPeak: isSoftPeak(
+          sweepRef.current,
+          bestsRef.current[currentSide]?.score ?? null,
+        ),
+        wasCapturable: wasCapturableRef.current,
+      };
+      const qualification = evaluateGuidance(input, poseConfig, currentSide,
+        bestsRef.current[currentSide], 0, extras);
+      timedStability.current = stepTimedStability(timedStability.current, {
+        timestampMs: now, angles: rawAngles, eligible: didSample && qualification.captureEligible,
+        source: simState.enabled ? "simulator" : "camera", side: currentSide,
+      }, poseConfig.captureConditions);
+      const guidance = evaluateGuidance(input, poseConfig, currentSide,
+        bestsRef.current[currentSide], timedStability.current.stable ?
+          Math.max(timedStability.current.stableMs, poseConfig.captureConditions.stableMs) : 0, extras);
       wasReadyRef.current = guidance.poseReady;
       wasCapturableRef.current = guidance.allowCapture;
 
@@ -711,13 +845,13 @@ export function EarCaptureApp() {
         readyBurst.current += 1;
         if (
           !simState.enabled &&
-          video &&
-          video.readyState >= 2 &&
-          video.videoWidth > 0 &&
+          cameraFrame &&
           quality
         ) {
           rememberVideoBurst(
-            video,
+            cameraFrame,
+            lastVideoTime.current,
+            now,
             frontalQualityScore(quality, yaw ?? 0),
             yaw,
             quality,
@@ -741,7 +875,7 @@ export function EarCaptureApp() {
         now,
         countdownMs: poseConfig.ready.autoshutterMs,
         burstCount: readyBurst.current,
-        burstNeeded: poseConfig.ready.burstFrames,
+        burstNeeded: 1,
       });
       countdownStartedAt.current = shutter.startedAt;
       if (shutter.fire) {
@@ -774,7 +908,7 @@ export function EarCaptureApp() {
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [landmarker, rememberVideoBurst, videoRef]);
+  }, [landmarker, rememberVideoBurst, videoRef, resetCaptureTiming]);
 
   const recalibrateSide = () => {
     const current = sideRef.current;
@@ -786,7 +920,11 @@ export function EarCaptureApp() {
     const next = clearPeakForSide(bestsRef.current, current);
     bestsRef.current = next;
     setBests(next);
-    savePersonalBests(next);
+    if (simRef.current.enabled) simulatorBestsRef.current = next;
+    else {
+      cameraBestsRef.current = next;
+      savePersonalBests(next);
+    }
     setRelearnArmed(false);
     resetSideSession(current);
   };
@@ -794,33 +932,14 @@ export function EarCaptureApp() {
   const retryStuck = () => {
     const current = sideRef.current;
     if (!isSideChosen(current)) return;
-    const now = performance.now();
-    wasCapturableRef.current = false;
-    stableFrames.current = 0;
-    progressRef.current = retryProgress(progressRef.current, now);
-    introUntilRef.current = sideIntroUntil(now);
-    const intro = introPromptFor(current);
-    dwellRef.current = {
-      displayed: intro,
-      candidate: intro,
-      candidateSinceMs: now,
-    };
-    setLive((prev) => ({
-      ...prev,
-      stuck: false,
-      prompt: intro,
-      allowCapture: false,
-      softReady: false,
-    }));
+    resetSideSession(current);
   };
 
   const retake = () => {
     setLastCapture(null);
     setCaptureFeedback(null);
-    capturedThisSideRef.current = false;
-    shutterLatch.current = false;
-    cancelReadyEpisode.current = false;
-    countdownStartedAt.current = null;
+    const current = sideRef.current;
+    if (isSideChosen(current)) resetSideSession(current);
   };
 
   const cancelAutoShutter = () => {
@@ -931,7 +1050,7 @@ export function EarCaptureApp() {
             <button
               type="button"
               className="stuck-retry"
-              onClick={() => void start()}
+              onClick={startCamera}
             >
               {t("openCamera")}
             </button>
@@ -989,17 +1108,17 @@ export function EarCaptureApp() {
       ) : null}
 
       <div className="dock">
-        <button type="button" className="ghost" onClick={() => void start()}>
+        <button type="button" className="ghost" onClick={startCamera}>
           {t("openCamera")}
         </button>
-        <button type="button" className="ghost" onClick={stop}>
+        <button type="button" className="ghost" onClick={stopCamera}>
           {t("closeCamera")}
         </button>
         {cameraDenied ? (
           <button
             type="button"
             className="capture"
-            onClick={() => void start()}
+            onClick={startCamera}
           >
             {t("openCamera")}
           </button>
@@ -1115,7 +1234,7 @@ export function EarCaptureApp() {
         {t("debugHud")}
       </label>
 
-      <SimulatorPanel sim={sim} onChange={setSim} />
+      <SimulatorPanel sim={sim} onChange={changeSimulator} />
 
       <footer className="foot">
         <p>{t("footer")}</p>

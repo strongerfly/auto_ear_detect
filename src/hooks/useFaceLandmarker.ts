@@ -15,7 +15,8 @@ async function createLandmarker(delegate: "GPU" | "CPU", modelUrl: string) {
       delegate,
     },
     runningMode: "VIDEO",
-    numFaces: 1,
+    // Two results are enough to reject a multi-person capture.
+    numFaces: 2,
     minFaceDetectionConfidence: 0.5,
     minFacePresenceConfidence: 0.5,
     minTrackingConfidence: 0.5,

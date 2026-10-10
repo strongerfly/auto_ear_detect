@@ -62,6 +62,8 @@ function familyOf(prompt: PromptKey): Family {
     case "WRONG_SIDE":
       return "yaw";
     case "CLEAR_HAIR":
+    case "BLURRY_EAR":
+    case "CHECK_EAR":
     case "BAD_LIGHT":
     case "TOO_DARK":
     case "TOO_BRIGHT":

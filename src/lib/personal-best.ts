@@ -1,9 +1,12 @@
 import type { EarSide, PoseConfig } from "../config";
 import { poseConfig } from "../config";
-import { frontalQualityScore } from "./quality";
+import { classifyEarQuality, frontalQualityScore } from "./quality";
 import type { EarQuality } from "./types";
 
 const STORAGE_KEY = "auto-ear-detect:best-yaw:v1";
+/** Allow slow devices, but never confirm a hold across a camera pause. */
+export const MAX_PEAK_SAMPLE_GAP_MS = 500;
+const MAX_PEAK_CONFIRM_WINDOW_MS = 1_500;
 
 export type PeakSample = {
   yaw: number;
@@ -67,6 +70,8 @@ export type BestYawSample = {
   side: EarSide;
   /** Per-frame |Δyaw|. Fast turns do not update bestYaw even if quality looks easy. */
   yawDelta?: number;
+  /** Monotonic capture timestamp, in milliseconds (requestAnimationFrame clock). */
+  timestampMs?: number;
 };
 
 function poseOkForBest(
@@ -81,6 +86,26 @@ function poseOkForBest(
     roll >= config.search.rollMin &&
     roll <= config.search.rollMax
   );
+}
+
+/** Learning must not remember a peak that exposure/pose gates cannot capture. */
+export function isBestYawSampleEligible(
+  sample: BestYawSample,
+  config: PoseConfig = poseConfig,
+): boolean {
+  const { yaw, pitch, roll, quality } = sample;
+  const delta = sample.yawDelta ?? 0;
+  const measurements = [
+    yaw, pitch, roll, delta, quality.laplacian, quality.brightness,
+    quality.edgeEnergy,
+  ];
+  if (!measurements.every(Number.isFinite)) return false;
+  if (delta < 0 || delta >= config.search.slowYawDeltaDeg) return false;
+  if (!yawInSearchWindow(yaw, sample.side, config)) return false;
+  if (!poseOkForBest(pitch, roll, config)) return false;
+  if (classifyEarQuality(quality, config) !== "ok") return false;
+  const score = frontalQualityScore(quality, yaw, config);
+  return Number.isFinite(score) && score >= config.score.scoreMinAbsolute;
 }
 
 /**
@@ -117,19 +142,15 @@ export function updatePersonalBest(
   sample: BestYawSample,
   config: PoseConfig = poseConfig,
 ): PeakSample | null {
-  const { yaw, pitch, roll, quality, side } = sample;
-  if (!yawInSearchWindow(yaw, side, config)) return current;
-  if (!poseOkForBest(pitch, roll, config)) return current;
-  if ((sample.yawDelta ?? 0) >= config.search.slowYawDeltaDeg) return current;
-
+  if (!isBestYawSampleEligible(sample, config)) return current;
+  const { yaw, quality } = sample;
   const score = frontalQualityScore(quality, yaw, config);
-  if (score < config.score.scoreMinAbsolute) return current;
   return applyPeakScore(current, yaw, score, config, 0);
 }
 
 export type PeakMemory = {
-  /** Recent in-window samples that still sit inside the confirm yaw band. */
-  recent: Array<{ yaw: number; score: number }>;
+  /** Fresh samples from one uninterrupted, valid hold on the same side. */
+  recent: Array<{ yaw: number; score: number; timestampMs: number; side: EarSide }>;
 };
 
 export function createPeakMemory(): PeakMemory {
@@ -162,19 +183,28 @@ export function settlePersonalBest(
   sample: BestYawSample,
   config: PoseConfig = poseConfig,
 ): SettledPeak {
-  const keep = { peak: current, memory };
-  const { yaw, pitch, roll, quality, side } = sample;
-  if (!yawInSearchWindow(yaw, side, config)) return keep;
-  if (!poseOkForBest(pitch, roll, config)) return keep;
-  if ((sample.yawDelta ?? 0) >= config.search.slowYawDeltaDeg) return keep;
-
+  const timestampMs = sample.timestampMs ?? performance.now();
+  if (!isBestYawSampleEligible(sample, config) ||
+      !Number.isFinite(timestampMs) || timestampMs < 0) {
+    return { peak: current, memory: createPeakMemory() };
+  }
+  const { yaw, quality, side } = sample;
   const score = frontalQualityScore(quality, yaw, config);
-  if (score < config.score.scoreMinAbsolute) return keep;
-
+  const last = memory.recent[memory.recent.length - 1];
+  if (last?.side === side && timestampMs === last.timestampMs) {
+    return { peak: current, memory };
+  }
+  const continuous = last?.side === side &&
+    timestampMs > last.timestampMs &&
+    timestampMs - last.timestampMs <= MAX_PEAK_SAMPLE_GAP_MS;
   const band = config.personalBest.confirmYawDeg;
   const recent = [
-    ...memory.recent.filter((item) => Math.abs(item.yaw - yaw) <= band),
-    { yaw, score },
+    ...(continuous ? memory.recent.filter((item) =>
+      item.side === side &&
+      timestampMs - item.timestampMs <= MAX_PEAK_CONFIRM_WINDOW_MS &&
+      Math.abs(item.yaw - yaw) <= band,
+    ) : []),
+    { yaw, score, timestampMs, side },
   ].slice(-config.personalBest.confirmFrames);
   const nextMemory: PeakMemory = { recent };
   if (recent.length < config.personalBest.confirmFrames) {
